@@ -1,13 +1,19 @@
 import Phaser from "phaser";
 
+interface PodiumData {
+  scores: [number, number];
+  winner: 0 | 1 | null;
+}
+
 export class PodiumScene extends Phaser.Scene {
   constructor() {
     super("PodiumScene");
   }
 
-  create(data: { scores: [number, number] }): void {
+  create(data: PodiumData): void {
     const { width, height } = this.scale;
     const [p1Score, p2Score] = data?.scores ?? [0, 0];
+    const winner = data?.winner ?? null;
 
     this.add
       .text(width / 2, height / 3, "Podium Ceremony", {
@@ -30,12 +36,14 @@ export class PodiumScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const result =
-      p1Score > p2Score
-        ? "Player 1 Wins!"
-        : p2Score > p1Score
-          ? "Player 2 Wins!"
-          : "It's a Tie!";
+    let result: string;
+    if (winner === 0) {
+      result = "Player 1 Wins!";
+    } else if (winner === 1) {
+      result = "Player 2 Wins!";
+    } else {
+      result = "It's a Tie!";
+    }
 
     this.add
       .text(width / 2, height / 2 + 60, result, {

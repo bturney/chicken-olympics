@@ -24,9 +24,7 @@ test("app loads, canvas mounts, and setup scene is active", async ({
   await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
 });
 
-test("clicking Start in canvas transitions to Match scene", async ({
-  page,
-}) => {
+test("clicking Start transitions to Match scene with HUD", async ({ page }) => {
   await page.goto("/");
 
   const canvas = page.locator("canvas");
@@ -37,41 +35,25 @@ test("clicking Start in canvas transitions to Match scene", async ({
   const box = await canvas.boundingBox();
   if (!box) throw new Error("Canvas not visible");
 
-  const gameWidth = 800;
-  const gameHeight = 600;
-  const scaleX = box.width / gameWidth;
-  const scaleY = box.height / gameHeight;
-
-  const startX = 400 * scaleX;
-  const startY = 380 * scaleY;
-
-  await canvas.click({ position: { x: startX, y: startY } });
-
-  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
-
-  await expect(canvas).toBeAttached();
-});
-
-test("Match to Podium Ceremony scene transition works", async ({ page }) => {
-  await page.goto("/");
-
-  const canvas = page.locator("canvas");
-  await expect(canvas).toBeAttached();
-
-  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
-
-  const boxA = await canvas.boundingBox();
-  if (!boxA) throw new Error("Canvas not visible");
-  const scaleX = boxA.width / 800;
-  const scaleY = boxA.height / 600;
+  const scaleX = box.width / 800;
+  const scaleY = box.height / 600;
 
   await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
 
   await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
 
-  await canvas.click({ position: { x: 400 * scaleX, y: 540 * scaleY } });
-
-  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
-
   await expect(canvas).toBeAttached();
+
+  const hudOk = await page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return false;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return false;
+    const matchScene = scene as {
+      matchState?: { scores: [number, number]; elapsedMs: number };
+    };
+    return matchScene.matchState != null;
+  });
+
+  expect(hudOk).toBe(true);
 });

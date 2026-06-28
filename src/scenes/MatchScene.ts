@@ -15,9 +15,14 @@ import {
   getActiveClaimAnimation,
   tickClaimAnimations,
   computeClaimPopScale,
+  createGreenChickState,
+  tickGreenChickState,
+  getActiveGreenChickSpotIndex,
+  attemptGreenChickClaim,
   type MatchState,
   type PeekState,
   type ClaimAnimationState,
+  type GreenChickState,
   NORMAL_PEEK_COUNT,
 } from "../match/rules";
 import { FARMYARD_LAYOUT } from "../match/layout";
@@ -31,6 +36,7 @@ import {
 const PLAYER_SIZE = 28;
 const CHICK_SIZE = 16;
 const CHICK_COLOR = 0xffdd44;
+const GREEN_CHICK_COLOR = 0x44cc44;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
 interface MatchSceneData {
@@ -49,6 +55,7 @@ function hexToCssHex(value: number): string {
 export class MatchScene extends Phaser.Scene {
   private matchState!: MatchState;
   private peekState!: PeekState;
+  private greenChickState!: GreenChickState;
   private claimAnimationState!: ClaimAnimationState;
   private timerText!: Phaser.GameObjects.Text;
   private p1ScoreText!: Phaser.GameObjects.Text;
@@ -62,6 +69,7 @@ export class MatchScene extends Phaser.Scene {
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
   private chickBodies: Phaser.Physics.Arcade.Sprite[] = [];
+  private greenChickBody!: Phaser.Physics.Arcade.Sprite;
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -84,6 +92,10 @@ export class MatchScene extends Phaser.Scene {
 
     this.matchState = createMatchState();
     this.peekState = createPeekState(0);
+    this.greenChickState = createGreenChickState(
+      this.matchState.durationMs,
+      () => Math.random(),
+    );
     this.claimAnimationState = createClaimAnimationState();
     this.transitioned = false;
     this.chickBodies = [];
@@ -109,6 +121,13 @@ export class MatchScene extends Phaser.Scene {
       FARMYARD_LAYOUT.hidingSpots.length,
       () => Math.random(),
     );
+    this.greenChickState = tickGreenChickState(
+      this.greenChickState,
+      this.peekState,
+      this.matchState.elapsedMs,
+      FARMYARD_LAYOUT.hidingSpots.length,
+      () => Math.random(),
+    );
     this.renderChicks();
   }
 
@@ -123,11 +142,19 @@ export class MatchScene extends Phaser.Scene {
       FARMYARD_LAYOUT.hidingSpots.length,
       () => Math.random(),
     );
+    this.greenChickState = tickGreenChickState(
+      this.greenChickState,
+      this.peekState,
+      this.matchState.elapsedMs,
+      FARMYARD_LAYOUT.hidingSpots.length,
+      () => Math.random(),
+    );
     this.claimAnimationState = tickClaimAnimations(
       this.claimAnimationState,
       this.matchState.elapsedMs,
     );
     this.renderChicks();
+    this.renderGreenChick();
     this.updateHUD();
 
     if (isMatchComplete(this.matchState)) {
@@ -230,6 +257,12 @@ export class MatchScene extends Phaser.Scene {
     gfx.fillStyle(CHICK_COLOR);
     gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
     gfx.generateTexture("chick", CHICK_SIZE * 2, CHICK_SIZE * 2);
+    gfx.clear();
+    gfx.fillStyle(GREEN_CHICK_COLOR);
+    gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
+    gfx.lineStyle(2, 0x2a7a2a, 1);
+    gfx.strokeCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE - 1);
+    gfx.generateTexture("green_chick", CHICK_SIZE * 2, CHICK_SIZE * 2);
     gfx.destroy();
 
     for (let i = 0; i < NORMAL_PEEK_COUNT; i++) {
@@ -239,6 +272,11 @@ export class MatchScene extends Phaser.Scene {
       body.setImmovable(true);
       this.chickBodies.push(body);
     }
+
+    this.greenChickBody = this.physics.add.sprite(0, 0, "green_chick");
+    this.greenChickBody.body!.enable = false;
+    this.greenChickBody.setVisible(false);
+    this.greenChickBody.setImmovable(true);
   }
 
   private createOverlaps(): void {
@@ -251,6 +289,12 @@ export class MatchScene extends Phaser.Scene {
         this.handleClaim(1, slotIndex),
       );
     }
+    this.physics.add.overlap(this.p1Chicken, this.greenChickBody, () =>
+      this.handleGreenChickClaim(0),
+    );
+    this.physics.add.overlap(this.p2Chicken, this.greenChickBody, () =>
+      this.handleGreenChickClaim(1),
+    );
   }
 
   private handleClaim(playerIndex: 0 | 1, slotIndex: number): void {
@@ -279,6 +323,25 @@ export class MatchScene extends Phaser.Scene {
         playerIndex,
         this.matchState.elapsedMs,
       );
+      this.updateHUD();
+    }
+  }
+
+  private handleGreenChickClaim(playerIndex: 0 | 1): void {
+    if (!this.greenChickBody.visible) return;
+    if (this.greenChickState.activeSpotIndex === null) return;
+
+    const result = attemptGreenChickClaim(
+      this.matchState,
+      this.greenChickState,
+      this.greenChickState.activeSpotIndex,
+      playerIndex,
+      this.matchState.elapsedMs,
+    );
+
+    if (result.claimed) {
+      this.matchState = result.matchState;
+      this.greenChickState = result.greenChickState;
       this.updateHUD();
     }
   }
@@ -430,6 +493,28 @@ export class MatchScene extends Phaser.Scene {
         body.setVisible(false);
       }
     }
+  }
+
+  private renderGreenChick(): void {
+    const now = this.matchState.elapsedMs;
+    const activeSpot = getActiveGreenChickSpotIndex(this.greenChickState, now);
+
+    if (activeSpot === null) {
+      if (this.greenChickBody.visible) {
+        this.greenChickBody.setTint(0xffffff);
+        this.greenChickBody.setScale(1);
+        this.greenChickBody.body!.enable = false;
+        this.greenChickBody.setVisible(false);
+      }
+      return;
+    }
+
+    const spot = FARMYARD_LAYOUT.hidingSpots[activeSpot]!;
+    this.greenChickBody.setPosition(spot.x, spot.y);
+    this.greenChickBody.setTint(0xffffff);
+    this.greenChickBody.setScale(1);
+    this.greenChickBody.body!.enable = true;
+    this.greenChickBody.setVisible(true);
   }
 
   private getPlayerColor(playerIndex: 0 | 1): number {

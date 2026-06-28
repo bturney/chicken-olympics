@@ -6,6 +6,12 @@ import {
   DEFAULT_MATCH_DURATION_MS,
   type MatchState,
 } from "../match/rules";
+import { FARMYARD_LAYOUT } from "../match/layout";
+
+const PLAYER_SIZE = 28;
+const P1_COLOR = 0x4488ff;
+const P2_COLOR = 0xff4444;
+const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
 export class MatchScene extends Phaser.Scene {
   private matchState!: MatchState;
@@ -13,6 +19,16 @@ export class MatchScene extends Phaser.Scene {
   private p1ScoreText!: Phaser.GameObjects.Text;
   private p2ScoreText!: Phaser.GameObjects.Text;
   private transitioned = false;
+
+  private p1Chicken!: Phaser.Physics.Arcade.Sprite;
+  private p2Chicken!: Phaser.Physics.Arcade.Sprite;
+  private wasd!: {
+    W: Phaser.Input.Keyboard.Key;
+    A: Phaser.Input.Keyboard.Key;
+    S: Phaser.Input.Keyboard.Key;
+    D: Phaser.Input.Keyboard.Key;
+  };
+  private arrows!: Phaser.Types.Input.Keyboard.CursorKeys;
 
   constructor() {
     super("MatchScene");
@@ -24,6 +40,39 @@ export class MatchScene extends Phaser.Scene {
     this.matchState = createMatchState();
     this.transitioned = false;
 
+    this.physics.world.setBounds(
+      FARMYARD_LAYOUT.bounds.x,
+      FARMYARD_LAYOUT.bounds.y,
+      FARMYARD_LAYOUT.bounds.width,
+      FARMYARD_LAYOUT.bounds.height,
+    );
+
+    this.createHUD(width);
+    this.createPlayers();
+    this.createInput();
+    this.drawBounds();
+  }
+
+  update(_time: number, delta: number): void {
+    if (this.transitioned) return;
+
+    this.handleMovement();
+    this.matchState = tick(this.matchState, delta);
+    this.updateHUD();
+
+    if (this.matchState.isComplete) {
+      this.transitioned = true;
+      this.time.delayedCall(500, () => {
+        const winner = getWinner(this.matchState);
+        this.scene.start("PodiumScene", {
+          scores: this.matchState.scores,
+          winner,
+        });
+      });
+    }
+  }
+
+  private createHUD(width: number): void {
     this.add
       .text(width / 2, 30, "Farmyard Stadium", {
         fontSize: "28px",
@@ -53,22 +102,82 @@ export class MatchScene extends Phaser.Scene {
     this.updateHUD();
   }
 
-  update(_time: number, delta: number): void {
-    if (this.transitioned) return;
+  private createPlayers(): void {
+    const gfx = this.add.graphics();
 
-    this.matchState = tick(this.matchState, delta);
-    this.updateHUD();
+    gfx.fillStyle(P1_COLOR);
+    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
+    gfx.generateTexture("p1_chicken", PLAYER_SIZE * 2, PLAYER_SIZE * 2);
 
-    if (this.matchState.isComplete) {
-      this.transitioned = true;
-      this.time.delayedCall(500, () => {
-        const winner = getWinner(this.matchState);
-        this.scene.start("PodiumScene", {
-          scores: this.matchState.scores,
-          winner,
-        });
-      });
-    }
+    gfx.clear();
+    gfx.fillStyle(P2_COLOR);
+    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
+    gfx.generateTexture("p2_chicken", PLAYER_SIZE * 2, PLAYER_SIZE * 2);
+
+    gfx.destroy();
+
+    const [p1Start, p2Start] = FARMYARD_LAYOUT.playerStartPositions;
+
+    this.p1Chicken = this.physics.add.sprite(
+      p1Start.x,
+      p1Start.y,
+      "p1_chicken",
+    );
+    this.p1Chicken.setCollideWorldBounds(true);
+    this.add
+      .text(p1Start.x, p1Start.y + PLAYER_SIZE + 4, "P1", {
+        fontSize: "14px",
+        color: "#4488ff",
+      })
+      .setOrigin(0.5);
+
+    this.p2Chicken = this.physics.add.sprite(
+      p2Start.x,
+      p2Start.y,
+      "p2_chicken",
+    );
+    this.p2Chicken.setCollideWorldBounds(true);
+    this.add
+      .text(p2Start.x, p2Start.y + PLAYER_SIZE + 4, "P2", {
+        fontSize: "14px",
+        color: "#ff4444",
+      })
+      .setOrigin(0.5);
+  }
+
+  private createInput(): void {
+    this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as {
+      W: Phaser.Input.Keyboard.Key;
+      A: Phaser.Input.Keyboard.Key;
+      S: Phaser.Input.Keyboard.Key;
+      D: Phaser.Input.Keyboard.Key;
+    };
+    this.arrows = this.input.keyboard!.createCursorKeys();
+  }
+
+  private handleMovement(): void {
+    const p1Vx =
+      (this.wasd.D.isDown ? MOVE_SPEED : 0) -
+      (this.wasd.A.isDown ? MOVE_SPEED : 0);
+    const p1Vy =
+      (this.wasd.S.isDown ? MOVE_SPEED : 0) -
+      (this.wasd.W.isDown ? MOVE_SPEED : 0);
+    this.p1Chicken.setVelocity(p1Vx, p1Vy);
+
+    const p2Vx =
+      (this.arrows.right.isDown ? MOVE_SPEED : 0) -
+      (this.arrows.left.isDown ? MOVE_SPEED : 0);
+    const p2Vy =
+      (this.arrows.down.isDown ? MOVE_SPEED : 0) -
+      (this.arrows.up.isDown ? MOVE_SPEED : 0);
+    this.p2Chicken.setVelocity(p2Vx, p2Vy);
+  }
+
+  private drawBounds(): void {
+    const { x, y, width, height } = FARMYARD_LAYOUT.bounds;
+    const border = this.add.graphics();
+    border.lineStyle(2, 0x44aa44, 0.6);
+    border.strokeRect(x, y, width, height);
   }
 
   private updateHUD(): void {

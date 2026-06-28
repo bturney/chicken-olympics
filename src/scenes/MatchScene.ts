@@ -15,19 +15,29 @@ import {
   type PeekState,
 } from "../match/rules";
 import { FARMYARD_LAYOUT } from "../match/layout";
-import type { PlayerChickenColor } from "../setup/colors";
+import { computeMoveVelocity } from "../match/movement";
+import {
+  getPlayerChickenColorLabel,
+  getPlayerChickenHex,
+  type PlayerChickenColor,
+} from "../setup/colors";
 
 const PLAYER_SIZE = 28;
 const CHICK_SIZE = 16;
 const CHICK_COLOR = 0xffdd44;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
-const P1_DEFAULT_HEX = 0x4488ff;
-const P2_DEFAULT_HEX = 0xff4444;
-
 interface MatchSceneData {
   p1Color?: PlayerChickenColor;
   p2Color?: PlayerChickenColor;
+}
+
+function playerTextureKey(player: 1 | 2, color: PlayerChickenColor): string {
+  return `p${player}_chicken_${color}`;
+}
+
+function hexToCssHex(value: number): string {
+  return "#" + value.toString(16).padStart(6, "0");
 }
 
 export class MatchScene extends Phaser.Scene {
@@ -36,6 +46,8 @@ export class MatchScene extends Phaser.Scene {
   private timerText!: Phaser.GameObjects.Text;
   private p1ScoreText!: Phaser.GameObjects.Text;
   private p2ScoreText!: Phaser.GameObjects.Text;
+  private p1Label!: Phaser.GameObjects.Text;
+  private p2Label!: Phaser.GameObjects.Text;
   private transitioned = false;
   private p1Color: PlayerChickenColor = "blue";
   private p2Color: PlayerChickenColor = "red";
@@ -100,6 +112,8 @@ export class MatchScene extends Phaser.Scene {
         this.scene.start("PodiumScene", {
           scores: this.matchState.scores,
           winner,
+          p1Color: this.p1Color,
+          p2Color: this.p2Color,
         });
       });
     }
@@ -120,15 +134,15 @@ export class MatchScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.p1ScoreText = this.add.text(20, 10, "P1 (Blue): 0", {
+    this.p1ScoreText = this.add.text(20, 10, "", {
       fontSize: "18px",
-      color: "#4488ff",
+      color: hexToCssHex(getPlayerChickenHex(this.p1Color)),
     });
 
     this.p2ScoreText = this.add
-      .text(width - 20, 10, "P2 (Red): 0", {
+      .text(width - 20, 10, "", {
         fontSize: "18px",
-        color: "#ff4444",
+        color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
       })
       .setOrigin(1, 0);
 
@@ -138,14 +152,22 @@ export class MatchScene extends Phaser.Scene {
   private createPlayers(): void {
     const gfx = this.add.graphics();
 
-    gfx.fillStyle(P1_DEFAULT_HEX);
+    gfx.fillStyle(getPlayerChickenHex(this.p1Color));
     gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
-    gfx.generateTexture("p1_chicken", PLAYER_SIZE * 2, PLAYER_SIZE * 2);
+    gfx.generateTexture(
+      playerTextureKey(1, this.p1Color),
+      PLAYER_SIZE * 2,
+      PLAYER_SIZE * 2,
+    );
 
     gfx.clear();
-    gfx.fillStyle(P2_DEFAULT_HEX);
+    gfx.fillStyle(getPlayerChickenHex(this.p2Color));
     gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
-    gfx.generateTexture("p2_chicken", PLAYER_SIZE * 2, PLAYER_SIZE * 2);
+    gfx.generateTexture(
+      playerTextureKey(2, this.p2Color),
+      PLAYER_SIZE * 2,
+      PLAYER_SIZE * 2,
+    );
 
     gfx.destroy();
 
@@ -154,26 +176,26 @@ export class MatchScene extends Phaser.Scene {
     this.p1Chicken = this.physics.add.sprite(
       p1Start.x,
       p1Start.y,
-      "p1_chicken",
+      playerTextureKey(1, this.p1Color),
     );
     this.p1Chicken.setCollideWorldBounds(true);
-    this.add
+    this.p1Label = this.add
       .text(p1Start.x, p1Start.y + PLAYER_SIZE + 4, "P1", {
         fontSize: "14px",
-        color: "#4488ff",
+        color: hexToCssHex(getPlayerChickenHex(this.p1Color)),
       })
       .setOrigin(0.5);
 
     this.p2Chicken = this.physics.add.sprite(
       p2Start.x,
       p2Start.y,
-      "p2_chicken",
+      playerTextureKey(2, this.p2Color),
     );
     this.p2Chicken.setCollideWorldBounds(true);
-    this.add
+    this.p2Label = this.add
       .text(p2Start.x, p2Start.y + PLAYER_SIZE + 4, "P2", {
         fontSize: "14px",
-        color: "#ff4444",
+        color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
       })
       .setOrigin(0.5);
   }
@@ -311,21 +333,27 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    const p1Vx =
-      (this.wasd.D.isDown ? MOVE_SPEED : 0) -
-      (this.wasd.A.isDown ? MOVE_SPEED : 0);
-    const p1Vy =
-      (this.wasd.S.isDown ? MOVE_SPEED : 0) -
-      (this.wasd.W.isDown ? MOVE_SPEED : 0);
-    this.p1Chicken.setVelocity(p1Vx, p1Vy);
+    const p1Velocity = computeMoveVelocity(
+      {
+        left: this.wasd.A.isDown,
+        right: this.wasd.D.isDown,
+        up: this.wasd.W.isDown,
+        down: this.wasd.S.isDown,
+      },
+      MOVE_SPEED,
+    );
+    this.p1Chicken.setVelocity(p1Velocity.vx, p1Velocity.vy);
 
-    const p2Vx =
-      (this.arrows.right.isDown ? MOVE_SPEED : 0) -
-      (this.arrows.left.isDown ? MOVE_SPEED : 0);
-    const p2Vy =
-      (this.arrows.down.isDown ? MOVE_SPEED : 0) -
-      (this.arrows.up.isDown ? MOVE_SPEED : 0);
-    this.p2Chicken.setVelocity(p2Vx, p2Vy);
+    const p2Velocity = computeMoveVelocity(
+      {
+        left: this.arrows.left.isDown,
+        right: this.arrows.right.isDown,
+        up: this.arrows.up.isDown,
+        down: this.arrows.down.isDown,
+      },
+      MOVE_SPEED,
+    );
+    this.p2Chicken.setVelocity(p2Velocity.vx, p2Velocity.vy);
   }
 
   private startNextPeek(): void {
@@ -371,7 +399,9 @@ export class MatchScene extends Phaser.Scene {
     const seconds = (remaining / 1000).toFixed(1);
     this.timerText.setText(`Time: ${seconds}s`);
 
-    this.p1ScoreText.setText(`P1 (Blue): ${this.matchState.scores[0]}`);
-    this.p2ScoreText.setText(`P2 (Red): ${this.matchState.scores[1]}`);
+    const p1Label = getPlayerChickenColorLabel(this.p1Color);
+    const p2Label = getPlayerChickenColorLabel(this.p2Color);
+    this.p1ScoreText.setText(`P1 (${p1Label}): ${this.matchState.scores[0]}`);
+    this.p2ScoreText.setText(`P2 (${p2Label}): ${this.matchState.scores[1]}`);
   }
 }

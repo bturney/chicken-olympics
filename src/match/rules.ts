@@ -50,50 +50,137 @@ export function getWinner(state: MatchState): 0 | 1 | null {
   return null;
 }
 
-export const DEFAULT_PEEK_DURATION_MS = 5_000;
+export const NORMAL_PEEK_COUNT = 3;
+export const NORMAL_PEEK_DURATION_MS = 5_000;
+export const NORMAL_REFILL_MIN_MS = 500;
+export const NORMAL_REFILL_MAX_MS = 1_500;
+export const NORMAL_CHICK_POINTS = 1;
 
-export interface PeekState {
+export interface NormalPeek {
   activeSpotIndex: number | null;
   peekStartedAtMs: number | null;
+  nextRefillAtMs: number | null;
 }
 
-export function createPeekState(): PeekState {
+export interface PeekState {
+  peeks: NormalPeek[];
+}
+
+export function createPeekState(now: number = 0): PeekState {
   return {
-    activeSpotIndex: null,
-    peekStartedAtMs: null,
+    peeks: Array.from({ length: NORMAL_PEEK_COUNT }, () => ({
+      activeSpotIndex: null,
+      peekStartedAtMs: null,
+      nextRefillAtMs: now,
+    })),
   };
 }
 
-export function selectNextPeekSpot(
-  spotCount: number,
-  randomValue: number,
-): number {
-  return Math.floor(randomValue * spotCount);
+export function isPeekActive(peek: NormalPeek, currentTimeMs: number): boolean {
+  if (peek.activeSpotIndex === null || peek.peekStartedAtMs === null) {
+    return false;
+  }
+  return currentTimeMs - peek.peekStartedAtMs < NORMAL_PEEK_DURATION_MS;
 }
 
-export function startPeek(
-  state: PeekState,
+export function getActiveNormalSpotIndices(
+  peekState: PeekState,
   currentTimeMs: number,
+): readonly number[] {
+  const out: number[] = [];
+  for (const peek of peekState.peeks) {
+    if (isPeekActive(peek, currentTimeMs) && peek.activeSpotIndex !== null) {
+      out.push(peek.activeSpotIndex);
+    }
+  }
+  return out;
+}
+
+export function computeRefillDelayMs(randomValue: number): number {
+  const clamped = Math.max(0, Math.min(1, randomValue));
+  return (
+    NORMAL_REFILL_MIN_MS +
+    clamped * (NORMAL_REFILL_MAX_MS - NORMAL_REFILL_MIN_MS)
+  );
+}
+
+export function selectFreeSpotIndex(
+  peekState: PeekState,
+  currentTimeMs: number,
+  spotCount: number,
+  randomValue: number,
+): number | null {
+  const active = new Set(getActiveNormalSpotIndices(peekState, currentTimeMs));
+  const free: number[] = [];
+  for (let i = 0; i < spotCount; i++) {
+    if (!active.has(i)) free.push(i);
+  }
+  if (free.length === 0) return null;
+  const index = Math.floor(randomValue * free.length);
+  return free[Math.min(index, free.length - 1)] ?? null;
+}
+
+function fillSlotAt(
+  peek: NormalPeek,
   spotIndex: number,
-): PeekState {
+  currentTimeMs: number,
+): NormalPeek {
   return {
     activeSpotIndex: spotIndex,
     peekStartedAtMs: currentTimeMs,
+    nextRefillAtMs: null,
   };
 }
 
-export function isPeekActive(state: PeekState, currentTimeMs: number): boolean {
-  if (state.activeSpotIndex === null || state.peekStartedAtMs === null) {
-    return false;
-  }
-  return currentTimeMs - state.peekStartedAtMs < DEFAULT_PEEK_DURATION_MS;
-}
-
-export function expirePeek(_state: PeekState): PeekState {
+function expireSlot(
+  peek: NormalPeek,
+  currentTimeMs: number,
+  random: () => number,
+): NormalPeek {
   return {
     activeSpotIndex: null,
     peekStartedAtMs: null,
+    nextRefillAtMs: currentTimeMs + computeRefillDelayMs(random()),
   };
+}
+
+export function tickPeekState(
+  peekState: PeekState,
+  currentTimeMs: number,
+  spotCount: number,
+  random: () => number,
+): PeekState {
+  const peeks: NormalPeek[] = [];
+  let workingState = peekState;
+  for (const peek of peekState.peeks) {
+    if (peek.activeSpotIndex !== null && peek.peekStartedAtMs !== null) {
+      if (currentTimeMs - peek.peekStartedAtMs >= NORMAL_PEEK_DURATION_MS) {
+        const expired = expireSlot(peek, currentTimeMs, random);
+        peeks.push(expired);
+        workingState = { peeks };
+      } else {
+        peeks.push(peek);
+      }
+      continue;
+    }
+    if (peek.nextRefillAtMs !== null && currentTimeMs >= peek.nextRefillAtMs) {
+      const spot = selectFreeSpotIndex(
+        workingState,
+        currentTimeMs,
+        spotCount,
+        random(),
+      );
+      if (spot === null) {
+        peeks.push(peek);
+      } else {
+        peeks.push(fillSlotAt(peek, spot, currentTimeMs));
+        workingState = { peeks };
+      }
+      continue;
+    }
+    peeks.push(peek);
+  }
+  return workingState;
 }
 
 export interface ClaimResult {
@@ -105,23 +192,24 @@ export interface ClaimResult {
 export function attemptClaim(
   matchState: MatchState,
   peekState: PeekState,
+  spotIndex: number,
   playerIndex: 0 | 1,
   currentTimeMs: number,
+  random: () => number,
 ): ClaimResult {
-  if (!isPeekActive(peekState, currentTimeMs)) {
-    return {
-      matchState,
-      peekState,
-      claimed: false,
-    };
+  const slotIndex = peekState.peeks.findIndex(
+    (p) => p.activeSpotIndex === spotIndex && isPeekActive(p, currentTimeMs),
+  );
+  if (slotIndex === -1) {
+    return { matchState, peekState, claimed: false };
   }
-
-  const newMatchState = addScore(matchState, playerIndex, 1);
-  const newPeekState = expirePeek(peekState);
-
+  const claimed = peekState.peeks[slotIndex]!;
+  const newPeeks = peekState.peeks.map((p, i) =>
+    i === slotIndex ? expireSlot(claimed, currentTimeMs, random) : p,
+  );
   return {
-    matchState: newMatchState,
-    peekState: newPeekState,
+    matchState: addScore(matchState, playerIndex, NORMAL_CHICK_POINTS),
+    peekState: { peeks: newPeeks },
     claimed: true,
   };
 }

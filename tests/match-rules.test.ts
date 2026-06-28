@@ -7,14 +7,22 @@ import {
   addScore,
   getWinner,
   createPeekState,
-  startPeek,
   isPeekActive,
-  expirePeek,
-  selectNextPeekSpot,
+  getActiveNormalSpotIndices,
+  computeRefillDelayMs,
+  selectFreeSpotIndex,
+  tickPeekState,
   attemptClaim,
   PRODUCTION_MATCH_DURATION_MS,
-  DEFAULT_PEEK_DURATION_MS,
+  NORMAL_PEEK_COUNT,
+  NORMAL_PEEK_DURATION_MS,
+  NORMAL_REFILL_MIN_MS,
+  NORMAL_REFILL_MAX_MS,
 } from "../src/match/rules";
+
+function constantRandom(value: number): () => number {
+  return () => value;
+}
 
 describe("createMatchState", () => {
   it("initializes both player scores to zero", () => {
@@ -169,126 +177,341 @@ describe("getWinner", () => {
   });
 });
 
-describe("selectNextPeekSpot", () => {
-  it("returns 0 when random value is at the start of the range", () => {
-    const spot = selectNextPeekSpot(4, 0);
-    expect(spot).toBe(0);
+describe("normal peek slot constants", () => {
+  it("defines three normal peek slots", () => {
+    expect(NORMAL_PEEK_COUNT).toBe(3);
   });
 
-  it("returns last spot when random value is near 1", () => {
-    const spot = selectNextPeekSpot(4, 0.999);
-    expect(spot).toBe(3);
+  it("uses a five second normal peek duration", () => {
+    expect(NORMAL_PEEK_DURATION_MS).toBe(5_000);
   });
 
-  it("returns different spots for different random values", () => {
-    const a = selectNextPeekSpot(4, 0.1);
-    const b = selectNextPeekSpot(4, 0.6);
+  it("uses 500ms to 1500ms refill delay bounds", () => {
+    expect(NORMAL_REFILL_MIN_MS).toBe(500);
+    expect(NORMAL_REFILL_MAX_MS).toBe(1_500);
+  });
+});
+
+describe("createPeekState", () => {
+  it("creates three peek slots", () => {
+    const state = createPeekState();
+
+    expect(state.peeks).toHaveLength(NORMAL_PEEK_COUNT);
+  });
+
+  it("starts with no active peeks when no time has elapsed", () => {
+    const state = createPeekState();
+    const active = getActiveNormalSpotIndices(state, 0);
+
+    expect(active).toEqual([]);
+  });
+});
+
+describe("tickPeekState", () => {
+  it("starts all three normal peeks immediately when there are enough spots", () => {
+    const state = createPeekState();
+    const ticked = tickPeekState(state, 0, 6, constantRandom(0.5));
+
+    const active = getActiveNormalSpotIndices(ticked, 0);
+    expect(active).toHaveLength(NORMAL_PEEK_COUNT);
+    expect(new Set(active).size).toBe(NORMAL_PEEK_COUNT);
+  });
+
+  it("keeps all three peeks active across subsequent ticks before any expire", () => {
+    let state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+    state = tickPeekState(state, 1_000, 6, constantRandom(0.5));
+    state = tickPeekState(state, 2_000, 6, constantRandom(0.5));
+
+    expect(getActiveNormalSpotIndices(state, 2_000)).toHaveLength(
+      NORMAL_PEEK_COUNT,
+    );
+  });
+
+  it("expires a peek after the five second peek duration has passed", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+    const firstPeek = state.peeks[0]!;
+    expect(isPeekActive(firstPeek, 0)).toBe(true);
+
+    const justBefore = tickPeekState(state, 4_999, 6, constantRandom(0.5));
+    expect(isPeekActive(justBefore.peeks[0]!, 4_999)).toBe(true);
+
+    const atExpiry = tickPeekState(state, 5_000, 6, constantRandom(0.5));
+    expect(isPeekActive(atExpiry.peeks[0]!, 5_000)).toBe(false);
+  });
+
+  it("schedules a new peek in the free spot after the refill delay elapses", () => {
+    let state = tickPeekState(createPeekState(), 0, 6, constantRandom(0));
+    const initialActive = [...getActiveNormalSpotIndices(state, 0)];
+
+    state = tickPeekState(state, 5_000, 6, constantRandom(0));
+
+    expect(getActiveNormalSpotIndices(state, 5_000)).toHaveLength(0);
+
+    const afterDelay = tickPeekState(
+      state,
+      5_000 + NORMAL_REFILL_MIN_MS,
+      6,
+      constantRandom(0.5),
+    );
+    const afterActive = getActiveNormalSpotIndices(
+      afterDelay,
+      5_000 + NORMAL_REFILL_MIN_MS,
+    );
+
+    expect(afterActive).toHaveLength(NORMAL_PEEK_COUNT);
+    for (const spot of afterActive) {
+      expect(spot).toBeGreaterThanOrEqual(0);
+      expect(spot).toBeLessThan(6);
+    }
+    void initialActive;
+  });
+
+  it("keeps normal peeks distinct from each other when refilling", () => {
+    let state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+
+    for (
+      let t = NORMAL_PEEK_DURATION_MS;
+      t < NORMAL_PEEK_DURATION_MS * 10;
+      t += 100
+    ) {
+      state = tickPeekState(state, t, 6, constantRandom(0.3));
+      const active = getActiveNormalSpotIndices(state, t);
+      expect(active.length).toBeLessThanOrEqual(NORMAL_PEEK_COUNT);
+      expect(new Set(active).size).toBe(active.length);
+    }
+  });
+});
+
+describe("computeRefillDelayMs", () => {
+  it("returns the minimum delay for a random value of 0", () => {
+    expect(computeRefillDelayMs(0)).toBe(NORMAL_REFILL_MIN_MS);
+  });
+
+  it("returns the maximum delay for a random value of 1", () => {
+    expect(computeRefillDelayMs(1)).toBe(NORMAL_REFILL_MAX_MS);
+  });
+
+  it("returns a value within the refill delay bounds for intermediate values", () => {
+    for (const v of [0.25, 0.5, 0.75]) {
+      const delay = computeRefillDelayMs(v);
+      expect(delay).toBeGreaterThanOrEqual(NORMAL_REFILL_MIN_MS);
+      expect(delay).toBeLessThanOrEqual(NORMAL_REFILL_MAX_MS);
+    }
+  });
+});
+
+describe("selectFreeSpotIndex", () => {
+  it("returns null when no spots are free", () => {
+    const state = tickPeekState(
+      createPeekState(),
+      0,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+
+    expect(selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT, 0.5)).toBeNull();
+  });
+
+  it("returns a free spot when at least one is available", () => {
+    const state = tickPeekState(
+      createPeekState(),
+      0,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+
+    const free = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.0);
+    expect(free).toBe(NORMAL_PEEK_COUNT);
+  });
+
+  it("picks deterministically based on the random value", () => {
+    const state = tickPeekState(
+      createPeekState(),
+      0,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+
+    const a = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.0);
+    const b = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.999);
     expect(a).not.toBe(b);
   });
 });
 
-describe("peek lifecycle", () => {
-  it("starts with no active peek", () => {
-    const state = createPeekState();
-    expect(isPeekActive(state, 0)).toBe(false);
-  });
-
-  it("activates a peek at the given spot and time", () => {
-    const state = startPeek(createPeekState(), 1000, 2);
-    expect(isPeekActive(state, 1000)).toBe(true);
-    expect(state.activeSpotIndex).toBe(2);
-  });
-
-  it("deactivates a peek after the peek duration", () => {
-    const state = startPeek(createPeekState(), 1000, 1);
-    expect(isPeekActive(state, 1000)).toBe(true);
-    expect(isPeekActive(state, 1000 + DEFAULT_PEEK_DURATION_MS)).toBe(false);
-  });
-
-  it("deactivates a peek after the peek duration plus some", () => {
-    const state = startPeek(createPeekState(), 1000, 1);
-    expect(isPeekActive(state, 1000 + DEFAULT_PEEK_DURATION_MS + 1)).toBe(
-      false,
-    );
-  });
-
-  it("keeps a peek active before the duration expires", () => {
-    const state = startPeek(createPeekState(), 1000, 3);
-    expect(isPeekActive(state, 1000 + DEFAULT_PEEK_DURATION_MS - 1)).toBe(true);
-  });
-
-  it("expirePeek clears the active peek", () => {
-    let state = startPeek(createPeekState(), 1000, 1);
-    expect(isPeekActive(state, 1000)).toBe(true);
-
-    state = expirePeek(state);
-    expect(isPeekActive(state, 5000)).toBe(false);
-    expect(state.activeSpotIndex).toBeNull();
-  });
-});
-
 describe("attemptClaim", () => {
-  it("scores one point for the claiming player and clears the peek", () => {
+  it("scores one point and frees the slot for refill when claiming an active peek", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
     const match = createMatchState();
-    const peek = startPeek(createPeekState(), 2000, 1);
-    const result = attemptClaim(match, peek, 0, 2000);
+    const activeSpot = getActiveNormalSpotIndices(state, 0)[0]!;
+
+    const result = attemptClaim(
+      match,
+      state,
+      activeSpot,
+      0,
+      1_000,
+      constantRandom(0.5),
+    );
 
     expect(result.claimed).toBe(true);
     expect(result.matchState.scores).toEqual([1, 0]);
-    expect(result.peekState.activeSpotIndex).toBeNull();
+    expect(getActiveNormalSpotIndices(result.peekState, 1_000)).toHaveLength(
+      NORMAL_PEEK_COUNT - 1,
+    );
   });
 
-  it("does not claim when no peek is active", () => {
+  it("does not claim when no peek is active at the requested spot", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
     const match = createMatchState();
-    const peek = createPeekState();
-    const result = attemptClaim(match, peek, 0, 1000);
 
-    expect(result.claimed).toBe(false);
-    expect(result.matchState.scores).toEqual([0, 0]);
-    expect(result.peekState.activeSpotIndex).toBeNull();
-  });
-
-  it("does not claim when the peek has expired", () => {
-    const match = createMatchState();
-    const peek = startPeek(createPeekState(), 1000, 2);
     const result = attemptClaim(
       match,
-      peek,
-      1,
-      1000 + DEFAULT_PEEK_DURATION_MS + 1,
+      state,
+      999,
+      0,
+      1_000,
+      constantRandom(0.5),
     );
 
     expect(result.claimed).toBe(false);
     expect(result.matchState.scores).toEqual([0, 0]);
   });
 
-  it("cannot claim the same peek twice (duplicate prevention)", () => {
+  it("does not claim when the peek at the requested spot has expired", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
     const match = createMatchState();
-    const peek = startPeek(createPeekState(), 3000, 0);
-    const first = attemptClaim(match, peek, 0, 3000);
+    const activeSpot = getActiveNormalSpotIndices(state, 0)[0]!;
+
+    const result = attemptClaim(
+      match,
+      state,
+      activeSpot,
+      0,
+      NORMAL_PEEK_DURATION_MS + 1,
+      constantRandom(0.5),
+    );
+
+    expect(result.claimed).toBe(false);
+    expect(result.matchState.scores).toEqual([0, 0]);
+  });
+
+  it("prevents duplicate claims on the same peek (first-Claim wins)", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+    const match = createMatchState();
+    const activeSpot = getActiveNormalSpotIndices(state, 0)[0]!;
+
+    const first = attemptClaim(
+      match,
+      state,
+      activeSpot,
+      0,
+      1_000,
+      constantRandom(0.5),
+    );
 
     expect(first.claimed).toBe(true);
 
-    const second = attemptClaim(first.matchState, first.peekState, 1, 3000);
+    const second = attemptClaim(
+      first.matchState,
+      first.peekState,
+      activeSpot,
+      1,
+      1_000,
+      constantRandom(0.5),
+    );
 
     expect(second.claimed).toBe(false);
     expect(second.matchState.scores).toEqual([1, 0]);
   });
 
-  it("accumulates scores across multiple claims", () => {
+  it("accumulates scores across multiple distinct claims by either player", () => {
+    let state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
     let match = createMatchState();
 
-    let peek = startPeek(createPeekState(), 1000, 0);
-    let result = attemptClaim(match, peek, 0, 1000);
-    match = result.matchState;
+    for (let i = 0; i < 3; i++) {
+      const active = getActiveNormalSpotIndices(state, 1_000 + i);
+      if (active.length === 0) break;
+      const result = attemptClaim(
+        match,
+        state,
+        active[0]!,
+        (i % 2) as 0 | 1,
+        1_000 + i,
+        constantRandom(0.5),
+      );
+      expect(result.claimed).toBe(true);
+      match = result.matchState;
+      state = result.peekState;
+    }
 
-    peek = startPeek(createPeekState(), 3000, 1);
-    result = attemptClaim(match, peek, 1, 3000);
-    match = result.matchState;
+    expect(match.scores[0] + match.scores[1]).toBeGreaterThanOrEqual(1);
+  });
+});
 
-    peek = startPeek(createPeekState(), 5000, 2);
-    result = attemptClaim(match, peek, 1, 5000);
+describe("deterministic randomized refill behavior", () => {
+  it("schedules the next refill exactly at the chosen delay after expiry", () => {
+    let state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+    const initialActive = [...getActiveNormalSpotIndices(state, 0)];
+    const claimedSpot = initialActive[0]!;
+    const otherActive = initialActive.slice(1);
 
-    expect(result.matchState.scores).toEqual([1, 2]);
+    const claimed = attemptClaim(
+      createMatchState(),
+      state,
+      claimedSpot,
+      0,
+      1_000,
+      constantRandom(0),
+    );
+
+    state = claimed.peekState;
+    const afterClaim = getActiveNormalSpotIndices(state, 1_000);
+    expect(afterClaim).toEqual(otherActive);
+
+    const refillTime = 1_000 + NORMAL_REFILL_MIN_MS;
+    const afterRefill = tickPeekState(
+      state,
+      refillTime,
+      6,
+      constantRandom(0.5),
+    );
+    expect(getActiveNormalSpotIndices(afterRefill, refillTime)).toHaveLength(
+      NORMAL_PEEK_COUNT,
+    );
+  });
+
+  it("uses the refill delay random value when computing the next refill window", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+    const claimed = attemptClaim(
+      createMatchState(),
+      state,
+      getActiveNormalSpotIndices(state, 0)[0]!,
+      0,
+      1_000,
+      constantRandom(0),
+    );
+
+    const beforeRefill = tickPeekState(
+      claimed.peekState,
+      1_000 + NORMAL_REFILL_MIN_MS - 1,
+      6,
+      constantRandom(0.5),
+    );
+    expect(
+      getActiveNormalSpotIndices(
+        beforeRefill,
+        1_000 + NORMAL_REFILL_MIN_MS - 1,
+      ),
+    ).toHaveLength(NORMAL_PEEK_COUNT - 1);
+
+    const atRefill = tickPeekState(
+      claimed.peekState,
+      1_000 + NORMAL_REFILL_MIN_MS,
+      6,
+      constantRandom(0.5),
+    );
+    expect(
+      getActiveNormalSpotIndices(atRefill, 1_000 + NORMAL_REFILL_MIN_MS),
+    ).toHaveLength(NORMAL_PEEK_COUNT);
   });
 });

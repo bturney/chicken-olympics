@@ -578,3 +578,222 @@ test("claim animation is removed and the claiming color tint clears once feedbac
   );
   expect(orangeTinted).toBeUndefined();
 });
+
+interface GreenChickProbe {
+  greenChickState: {
+    status: string;
+    scheduledAtMs: number;
+    activeSpotIndex: number | null;
+    peekStartedAtMs: number | null;
+  };
+  greenChickBody: { x: number; y: number; visible: boolean };
+  scores: [number, number];
+  p1ScoreText: string;
+  p2ScoreText: string;
+  elapsedMs: number;
+}
+
+function probeGreenChick(
+  page: import("@playwright/test").Page,
+): Promise<GreenChickProbe | null> {
+  return page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return null;
+    const match = scene as unknown as {
+      greenChickState: {
+        status: string;
+        scheduledAtMs: number;
+        activeSpotIndex: number | null;
+        peekStartedAtMs: number | null;
+      };
+      greenChickBody: { x: number; y: number; visible: boolean };
+      matchState: { scores: [number, number]; elapsedMs: number };
+      p1ScoreText: { text: string };
+      p2ScoreText: { text: string };
+    };
+    return {
+      greenChickState: match.greenChickState,
+      greenChickBody: match.greenChickBody,
+      scores: match.matchState.scores,
+      p1ScoreText: match.p1ScoreText.text,
+      p2ScoreText: match.p2ScoreText.text,
+      elapsedMs: match.matchState.elapsedMs,
+    };
+  });
+}
+
+async function activateGreenChickForTest(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return;
+    const match = scene as unknown as {
+      greenChickState: {
+        status: string;
+        scheduledAtMs: number;
+        activeSpotIndex: number | null;
+        peekStartedAtMs: number | null;
+        claimedAtMs: number | null;
+        claimedByPlayerIndex: 0 | 1 | null;
+      };
+      matchState: { elapsedMs: number };
+      greenChickBody: {
+        x: number;
+        y: number;
+        body: { enable: boolean } | null;
+        setPosition: (x: number, y: number) => void;
+        setVisible: (v: boolean) => void;
+      };
+    };
+    match.greenChickState = {
+      status: "active",
+      scheduledAtMs: 0,
+      activeSpotIndex: 5,
+      peekStartedAtMs: match.matchState.elapsedMs,
+      claimedAtMs: null,
+      claimedByPlayerIndex: null,
+    };
+    match.greenChickBody.setPosition(560, 490);
+    match.greenChickBody.setVisible(true);
+    if (match.greenChickBody.body) {
+      match.greenChickBody.body.enable = true;
+    }
+  });
+}
+
+test("Green Chick is scheduled between 20 and 70 seconds in the 90 second match", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  const probe = await probeGreenChick(page);
+  expect(probe).not.toBeNull();
+  expect(probe?.greenChickState.status).toBe("pending");
+  expect(probe?.greenChickState.scheduledAtMs).toBeGreaterThanOrEqual(20_000);
+  expect(probe?.greenChickState.scheduledAtMs).toBeLessThanOrEqual(70_000);
+});
+
+test("Green Chick renders as an extra peek and awards five points when claimed", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await expect
+    .poll(async () => (await probeClaimFeedback(page))?.chickBodies.length, {
+      timeout: 2_000,
+    })
+    .toBe(3);
+
+  await activateGreenChickForTest(page);
+
+  await page.waitForTimeout(300);
+
+  const result = await page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return null;
+    const match = scene as unknown as {
+      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
+    };
+    match.handleGreenChickClaim(0);
+    return { called: true };
+  });
+
+  expect(result?.called).toBe(true);
+
+  await expect
+    .poll(() => probeGreenChick(page), { timeout: 2_000 })
+    .toMatchObject({
+      scores: [5, 0],
+      p1ScoreText: "P1 (Blue): 5",
+      greenChickState: { status: "claimed" },
+    });
+});
+
+test("Green Chick does not return after the match continues past its expiry", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 480 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 640 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await activateGreenChickForTest(page);
+
+  await page.waitForTimeout(300);
+
+  await page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return;
+    const match = scene as unknown as {
+      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
+    };
+    match.handleGreenChickClaim(0);
+  });
+
+  await expect
+    .poll(() => probeGreenChick(page), { timeout: 2_000 })
+    .toMatchObject({ greenChickState: { status: "claimed" } });
+
+  const beforeAdvance = await probeGreenChick(page);
+  expect(beforeAdvance?.elapsedMs).toBeDefined();
+
+  await page.evaluate((targetElapsedMs) => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return;
+    const match = scene as unknown as {
+      matchState: { elapsedMs: number };
+    };
+    match.matchState.elapsedMs = targetElapsedMs;
+  }, 30_000);
+
+  await expect
+    .poll(() => probeGreenChick(page), { timeout: 2_000 })
+    .toMatchObject({ greenChickState: { status: "claimed" } });
+});

@@ -13,11 +13,19 @@ import {
   selectFreeSpotIndex,
   tickPeekState,
   attemptClaim,
+  createGreenChickState,
+  tickGreenChickState,
+  getActiveGreenChickSpotIndex,
+  attemptGreenChickClaim,
+  isGreenChickPeekActive,
   PRODUCTION_MATCH_DURATION_MS,
   NORMAL_PEEK_COUNT,
   NORMAL_PEEK_DURATION_MS,
   NORMAL_REFILL_MIN_MS,
   NORMAL_REFILL_MAX_MS,
+  GREEN_CHICK_POINTS,
+  GREEN_CHICK_SCHEDULE_MIN_MS,
+  GREEN_CHICK_SCHEDULE_MAX_MS,
 } from "../src/match/rules";
 
 function constantRandom(value: number): () => number {
@@ -174,6 +182,520 @@ describe("getWinner", () => {
     state = addScore(state, 1, 3);
 
     expect(getWinner(state)).toBeNull();
+  });
+});
+
+describe("green chick constants", () => {
+  it("rewards a Green Chick claim with five points", () => {
+    expect(GREEN_CHICK_POINTS).toBe(5);
+  });
+
+  it("schedules the Green Chick between 20 and 70 seconds in a 90 second Match", () => {
+    expect(GREEN_CHICK_SCHEDULE_MIN_MS).toBe(20_000);
+    expect(GREEN_CHICK_SCHEDULE_MAX_MS).toBe(70_000);
+    expect(PRODUCTION_MATCH_DURATION_MS).toBe(90_000);
+  });
+});
+
+describe("createGreenChickState", () => {
+  it("starts in the pending state with no active spot", () => {
+    const state = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0.5),
+    );
+
+    expect(state.status).toBe("pending");
+    expect(state.activeSpotIndex).toBeNull();
+    expect(state.peekStartedAtMs).toBeNull();
+  });
+
+  it("schedules the Green Chick at the minimum bound when random returns 0", () => {
+    const state = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+
+    expect(state.scheduledAtMs).toBe(GREEN_CHICK_SCHEDULE_MIN_MS);
+  });
+
+  it("schedules the Green Chick below the maximum bound when random returns just under 1", () => {
+    const state = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0.999),
+    );
+
+    expect(state.scheduledAtMs).toBeGreaterThan(GREEN_CHICK_SCHEDULE_MIN_MS);
+    expect(state.scheduledAtMs).toBeLessThan(GREEN_CHICK_SCHEDULE_MAX_MS);
+  });
+
+  it("scales the schedule proportionally for a custom match duration", () => {
+    const state = createGreenChickState(9_000, constantRandom(0.5));
+
+    expect(state.scheduledAtMs).toBeGreaterThanOrEqual(2_000);
+    expect(state.scheduledAtMs).toBeLessThan(7_000);
+  });
+
+  it("returns no claimed player on creation", () => {
+    const state = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0.5),
+    );
+
+    expect(state.claimedAtMs).toBeNull();
+    expect(state.claimedByPlayerIndex).toBeNull();
+  });
+});
+
+describe("tickGreenChickState", () => {
+  it("stays pending before the scheduled time", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+
+    const next = tickGreenChickState(
+      green,
+      createPeekState(),
+      green.scheduledAtMs - 1,
+      6,
+      constantRandom(0.5),
+    );
+
+    expect(next.status).toBe("pending");
+    expect(next.activeSpotIndex).toBeNull();
+  });
+
+  it("becomes active when scheduled and a free hiding spot exists", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const peekState = createPeekState();
+
+    const next = tickGreenChickState(
+      green,
+      peekState,
+      green.scheduledAtMs,
+      6,
+      constantRandom(0),
+    );
+
+    expect(next.status).toBe("active");
+    expect(next.activeSpotIndex).not.toBeNull();
+    expect(next.peekStartedAtMs).toBe(green.scheduledAtMs);
+  });
+
+  it("waits for a free hiding spot when all spots are occupied by normal peeks", () => {
+    const matchDuration = 9_000;
+    const green = createGreenChickState(matchDuration, constantRandom(0));
+    expect(green.scheduledAtMs).toBe(2_000);
+
+    const peekState = tickPeekState(
+      createPeekState(),
+      0,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+    expect(getActiveNormalSpotIndices(peekState, 2_000)).toHaveLength(
+      NORMAL_PEEK_COUNT,
+    );
+
+    const next = tickGreenChickState(
+      green,
+      peekState,
+      2_000,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+
+    expect(next.status).toBe("waiting");
+    expect(next.activeSpotIndex).toBeNull();
+  });
+
+  it("takes a free hiding spot once a normal peek expires while waiting", () => {
+    const matchDuration = 9_000;
+    const green = createGreenChickState(matchDuration, constantRandom(0));
+    const peekState = tickPeekState(
+      createPeekState(),
+      0,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+
+    const waiting = tickGreenChickState(
+      green,
+      peekState,
+      2_000,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+    expect(waiting.status).toBe("waiting");
+
+    const expiredPeekState = tickPeekState(
+      peekState,
+      2_000 + NORMAL_PEEK_DURATION_MS,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+    expect(
+      getActiveNormalSpotIndices(
+        expiredPeekState,
+        2_000 + NORMAL_PEEK_DURATION_MS,
+      ),
+    ).toHaveLength(0);
+
+    const active = tickGreenChickState(
+      waiting,
+      expiredPeekState,
+      2_000 + NORMAL_PEEK_DURATION_MS,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0),
+    );
+
+    expect(active.status).toBe("active");
+    expect(active.activeSpotIndex).not.toBeNull();
+  });
+
+  it("does not return to active after the peek expires and is marked missed", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const peekState = createPeekState();
+    const active = tickGreenChickState(
+      green,
+      peekState,
+      green.scheduledAtMs,
+      6,
+      constantRandom(0),
+    );
+    expect(active.status).toBe("active");
+
+    const expired = tickGreenChickState(
+      active,
+      peekState,
+      green.scheduledAtMs + NORMAL_PEEK_DURATION_MS,
+      6,
+      constantRandom(0.5),
+    );
+    expect(expired.status).toBe("missed");
+    expect(expired.activeSpotIndex).toBeNull();
+
+    const later = tickGreenChickState(
+      expired,
+      peekState,
+      green.scheduledAtMs + NORMAL_PEEK_DURATION_MS + 1_000,
+      6,
+      constantRandom(0.5),
+    );
+    expect(later.status).toBe("missed");
+  });
+
+  it("does not return to active after a claim", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const peekState = createPeekState();
+    const active = tickGreenChickState(
+      green,
+      peekState,
+      green.scheduledAtMs,
+      6,
+      constantRandom(0),
+    );
+
+    const claim = attemptGreenChickClaim(
+      createMatchState(),
+      active,
+      active.activeSpotIndex!,
+      0,
+      green.scheduledAtMs + 100,
+    );
+    expect(claim.greenChickState.status).toBe("claimed");
+    expect(claim.matchState.scores).toEqual([GREEN_CHICK_POINTS, 0]);
+
+    const later = tickGreenChickState(
+      claim.greenChickState,
+      peekState,
+      green.scheduledAtMs + 1_000,
+      6,
+      constantRandom(0.5),
+    );
+    expect(later.status).toBe("claimed");
+  });
+});
+
+describe("isGreenChickPeekActive", () => {
+  it("returns true while the Green Chick is peeking and within the duration", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const peekState = createPeekState();
+    const active = tickGreenChickState(
+      green,
+      peekState,
+      green.scheduledAtMs,
+      6,
+      constantRandom(0),
+    );
+
+    expect(isGreenChickPeekActive(active, green.scheduledAtMs)).toBe(true);
+    expect(
+      isGreenChickPeekActive(
+        active,
+        green.scheduledAtMs + NORMAL_PEEK_DURATION_MS - 1,
+      ),
+    ).toBe(true);
+    expect(
+      isGreenChickPeekActive(
+        active,
+        green.scheduledAtMs + NORMAL_PEEK_DURATION_MS,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("getActiveGreenChickSpotIndex", () => {
+  it("returns the active spot while the Green Chick is peeking", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const peekState = createPeekState();
+    const active = tickGreenChickState(
+      green,
+      peekState,
+      green.scheduledAtMs,
+      6,
+      constantRandom(0),
+    );
+
+    expect(getActiveGreenChickSpotIndex(active, green.scheduledAtMs)).toBe(
+      active.activeSpotIndex,
+    );
+  });
+
+  it("returns null before the Green Chick activates", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+
+    expect(getActiveGreenChickSpotIndex(green, 0)).toBeNull();
+  });
+
+  it("returns null after the Green Chick expires", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const peekState = createPeekState();
+    const active = tickGreenChickState(
+      green,
+      peekState,
+      green.scheduledAtMs,
+      6,
+      constantRandom(0),
+    );
+    const expired = tickGreenChickState(
+      active,
+      peekState,
+      green.scheduledAtMs + NORMAL_PEEK_DURATION_MS + 1,
+      6,
+      constantRandom(0.5),
+    );
+
+    expect(
+      getActiveGreenChickSpotIndex(
+        expired,
+        green.scheduledAtMs + NORMAL_PEEK_DURATION_MS + 1,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("attemptGreenChickClaim", () => {
+  function makeActiveGreenChick() {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const peekState = createPeekState();
+    const active = tickGreenChickState(
+      green,
+      peekState,
+      green.scheduledAtMs,
+      6,
+      constantRandom(0),
+    );
+    return { green, active };
+  }
+
+  it("scores five points and marks the Green Chick claimed when a player claims the active spot", () => {
+    const { active } = makeActiveGreenChick();
+    const match = createMatchState();
+
+    const result = attemptGreenChickClaim(
+      match,
+      active,
+      active.activeSpotIndex!,
+      0,
+      active.peekStartedAtMs! + 100,
+    );
+
+    expect(result.claimed).toBe(true);
+    expect(result.matchState.scores).toEqual([GREEN_CHICK_POINTS, 0]);
+    expect(result.greenChickState.status).toBe("claimed");
+    expect(result.greenChickState.claimedByPlayerIndex).toBe(0);
+    expect(result.greenChickState.claimedAtMs).toBe(
+      active.peekStartedAtMs! + 100,
+    );
+  });
+
+  it("scores five points for player 2 too", () => {
+    const { active } = makeActiveGreenChick();
+    const match = createMatchState();
+
+    const result = attemptGreenChickClaim(
+      match,
+      active,
+      active.activeSpotIndex!,
+      1,
+      active.peekStartedAtMs! + 100,
+    );
+
+    expect(result.claimed).toBe(true);
+    expect(result.matchState.scores).toEqual([0, GREEN_CHICK_POINTS]);
+  });
+
+  it("does not claim when the spot does not match the active Green Chick spot", () => {
+    const { active } = makeActiveGreenChick();
+    const match = createMatchState();
+
+    const wrongSpot =
+      active.activeSpotIndex === 0 ? 1 : (active.activeSpotIndex ?? 0) + 1;
+    const result = attemptGreenChickClaim(
+      match,
+      active,
+      wrongSpot,
+      0,
+      active.peekStartedAtMs! + 100,
+    );
+
+    expect(result.claimed).toBe(false);
+    expect(result.matchState.scores).toEqual([0, 0]);
+  });
+
+  it("does not claim when the Green Chick peek has expired", () => {
+    const { active } = makeActiveGreenChick();
+    const match = createMatchState();
+
+    const result = attemptGreenChickClaim(
+      match,
+      active,
+      active.activeSpotIndex!,
+      0,
+      active.peekStartedAtMs! + NORMAL_PEEK_DURATION_MS + 1,
+    );
+
+    expect(result.claimed).toBe(false);
+    expect(result.matchState.scores).toEqual([0, 0]);
+  });
+
+  it("prevents duplicate claims after a successful claim (first-Claim wins)", () => {
+    const { active } = makeActiveGreenChick();
+    const match = createMatchState();
+
+    const first = attemptGreenChickClaim(
+      match,
+      active,
+      active.activeSpotIndex!,
+      0,
+      active.peekStartedAtMs! + 100,
+    );
+    expect(first.claimed).toBe(true);
+
+    const second = attemptGreenChickClaim(
+      first.matchState,
+      first.greenChickState,
+      active.activeSpotIndex!,
+      1,
+      active.peekStartedAtMs! + 200,
+    );
+
+    expect(second.claimed).toBe(false);
+    expect(second.matchState.scores).toEqual([GREEN_CHICK_POINTS, 0]);
+  });
+
+  it("does not claim when the Green Chick is in pending status", () => {
+    const green = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0),
+    );
+    const result = attemptGreenChickClaim(createMatchState(), green, 0, 0, 0);
+
+    expect(result.claimed).toBe(false);
+  });
+
+  it("does not claim when the Green Chick is in waiting status", () => {
+    const matchDuration = 9_000;
+    const green = createGreenChickState(matchDuration, constantRandom(0));
+    const peekState = tickPeekState(
+      createPeekState(),
+      0,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+    const waiting = tickGreenChickState(
+      green,
+      peekState,
+      2_000,
+      NORMAL_PEEK_COUNT,
+      constantRandom(0.5),
+    );
+    expect(waiting.status).toBe("waiting");
+
+    const result = attemptGreenChickClaim(
+      createMatchState(),
+      waiting,
+      0,
+      0,
+      2_000,
+    );
+
+    expect(result.claimed).toBe(false);
+  });
+});
+
+describe("Green Chick scheduling window", () => {
+  it("schedules within the 20 to 70 second window for a 90 second match across random values", () => {
+    for (const v of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999]) {
+      const state = createGreenChickState(
+        PRODUCTION_MATCH_DURATION_MS,
+        constantRandom(v),
+      );
+      expect(state.scheduledAtMs).toBeGreaterThanOrEqual(
+        GREEN_CHICK_SCHEDULE_MIN_MS,
+      );
+      expect(state.scheduledAtMs).toBeLessThanOrEqual(
+        GREEN_CHICK_SCHEDULE_MAX_MS - 1,
+      );
+    }
+  });
+
+  it("produces a different schedule for different random values", () => {
+    const a = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0.1),
+    );
+    const b = createGreenChickState(
+      PRODUCTION_MATCH_DURATION_MS,
+      constantRandom(0.7),
+    );
+
+    expect(a.scheduledAtMs).not.toBe(b.scheduledAtMs);
   });
 });
 

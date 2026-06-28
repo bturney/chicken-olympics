@@ -56,6 +56,185 @@ export const NORMAL_REFILL_MIN_MS = 500;
 export const NORMAL_REFILL_MAX_MS = 1_500;
 export const NORMAL_CHICK_POINTS = 1;
 
+export const GREEN_CHICK_POINTS = 5;
+export const GREEN_CHICK_SCHEDULE_MIN_MS = 20_000;
+export const GREEN_CHICK_SCHEDULE_MAX_MS = 70_000;
+
+export type GreenChickStatus =
+  "pending" | "waiting" | "active" | "claimed" | "missed";
+
+export interface GreenChickState {
+  status: GreenChickStatus;
+  scheduledAtMs: number;
+  activeSpotIndex: number | null;
+  peekStartedAtMs: number | null;
+  claimedAtMs: number | null;
+  claimedByPlayerIndex: 0 | 1 | null;
+}
+
+export function createGreenChickState(
+  matchDurationMs: number,
+  random: () => number,
+): GreenChickState {
+  const range = GREEN_CHICK_SCHEDULE_MAX_MS - GREEN_CHICK_SCHEDULE_MIN_MS;
+  const scaledRange = Math.floor(
+    (range * matchDurationMs) / PRODUCTION_MATCH_DURATION_MS,
+  );
+  const scheduledAtMs =
+    Math.floor(
+      (GREEN_CHICK_SCHEDULE_MIN_MS * matchDurationMs) /
+        PRODUCTION_MATCH_DURATION_MS,
+    ) + Math.floor(random() * scaledRange);
+  return {
+    status: "pending",
+    scheduledAtMs,
+    activeSpotIndex: null,
+    peekStartedAtMs: null,
+    claimedAtMs: null,
+    claimedByPlayerIndex: null,
+  };
+}
+
+function selectFreeSpotForGreenChick(
+  peekState: PeekState,
+  greenChickState: GreenChickState,
+  currentTimeMs: number,
+  spotCount: number,
+  randomValue: number,
+): number | null {
+  const occupied = new Set(
+    getActiveNormalSpotIndices(peekState, currentTimeMs),
+  );
+  if (greenChickState.activeSpotIndex !== null) {
+    occupied.add(greenChickState.activeSpotIndex);
+  }
+  const free: number[] = [];
+  for (let i = 0; i < spotCount; i++) {
+    if (!occupied.has(i)) free.push(i);
+  }
+  if (free.length === 0) return null;
+  const index = Math.floor(randomValue * free.length);
+  return free[Math.min(index, free.length - 1)] ?? null;
+}
+
+export function isGreenChickPeekActive(
+  greenChickState: GreenChickState,
+  currentTimeMs: number,
+): boolean {
+  if (
+    greenChickState.status !== "active" ||
+    greenChickState.peekStartedAtMs === null
+  ) {
+    return false;
+  }
+  return (
+    currentTimeMs - greenChickState.peekStartedAtMs < NORMAL_PEEK_DURATION_MS
+  );
+}
+
+export function getActiveGreenChickSpotIndex(
+  greenChickState: GreenChickState,
+  currentTimeMs: number,
+): number | null {
+  if (!isGreenChickPeekActive(greenChickState, currentTimeMs)) {
+    return null;
+  }
+  return greenChickState.activeSpotIndex;
+}
+
+export function tickGreenChickState(
+  greenChickState: GreenChickState,
+  peekState: PeekState,
+  currentTimeMs: number,
+  spotCount: number,
+  random: () => number,
+): GreenChickState {
+  if (greenChickState.status === "claimed") {
+    return greenChickState;
+  }
+
+  if (greenChickState.status === "missed") {
+    return greenChickState;
+  }
+
+  if (
+    greenChickState.status === "active" &&
+    greenChickState.peekStartedAtMs !== null &&
+    currentTimeMs - greenChickState.peekStartedAtMs >= NORMAL_PEEK_DURATION_MS
+  ) {
+    return {
+      ...greenChickState,
+      status: "missed",
+      activeSpotIndex: null,
+      peekStartedAtMs: null,
+    };
+  }
+
+  if (currentTimeMs < greenChickState.scheduledAtMs) {
+    return greenChickState.status === "pending"
+      ? greenChickState
+      : { ...greenChickState, status: "pending" };
+  }
+
+  if (greenChickState.status === "active") {
+    return greenChickState;
+  }
+
+  const spot = selectFreeSpotForGreenChick(
+    peekState,
+    greenChickState,
+    currentTimeMs,
+    spotCount,
+    random(),
+  );
+
+  if (spot === null) {
+    return greenChickState.status === "waiting"
+      ? greenChickState
+      : { ...greenChickState, status: "waiting" };
+  }
+
+  return {
+    ...greenChickState,
+    status: "active",
+    activeSpotIndex: spot,
+    peekStartedAtMs: currentTimeMs,
+  };
+}
+
+export interface GreenChickClaimResult {
+  matchState: MatchState;
+  greenChickState: GreenChickState;
+  claimed: boolean;
+}
+
+export function attemptGreenChickClaim(
+  matchState: MatchState,
+  greenChickState: GreenChickState,
+  spotIndex: number,
+  playerIndex: 0 | 1,
+  currentTimeMs: number,
+): GreenChickClaimResult {
+  if (
+    !isGreenChickPeekActive(greenChickState, currentTimeMs) ||
+    greenChickState.activeSpotIndex !== spotIndex
+  ) {
+    return { matchState, greenChickState, claimed: false };
+  }
+  return {
+    matchState: addScore(matchState, playerIndex, GREEN_CHICK_POINTS),
+    greenChickState: {
+      ...greenChickState,
+      status: "claimed",
+      activeSpotIndex: null,
+      peekStartedAtMs: null,
+      claimedAtMs: currentTimeMs,
+      claimedByPlayerIndex: playerIndex,
+    },
+    claimed: true,
+  };
+}
+
 export interface NormalPeek {
   activeSpotIndex: number | null;
   peekStartedAtMs: number | null;

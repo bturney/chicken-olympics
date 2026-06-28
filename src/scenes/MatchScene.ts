@@ -15,13 +15,20 @@ import {
   type PeekState,
 } from "../match/rules";
 import { FARMYARD_LAYOUT } from "../match/layout";
+import type { PlayerChickenColor } from "../setup/colors";
 
 const PLAYER_SIZE = 28;
 const CHICK_SIZE = 16;
-const P1_COLOR = 0x4488ff;
-const P2_COLOR = 0xff4444;
 const CHICK_COLOR = 0xffdd44;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
+
+const P1_DEFAULT_HEX = 0x4488ff;
+const P2_DEFAULT_HEX = 0xff4444;
+
+interface MatchSceneData {
+  p1Color?: PlayerChickenColor;
+  p2Color?: PlayerChickenColor;
+}
 
 export class MatchScene extends Phaser.Scene {
   private matchState!: MatchState;
@@ -30,6 +37,8 @@ export class MatchScene extends Phaser.Scene {
   private p1ScoreText!: Phaser.GameObjects.Text;
   private p2ScoreText!: Phaser.GameObjects.Text;
   private transitioned = false;
+  private p1Color: PlayerChickenColor = "blue";
+  private p2Color: PlayerChickenColor = "red";
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
@@ -44,6 +53,11 @@ export class MatchScene extends Phaser.Scene {
 
   constructor() {
     super("MatchScene");
+  }
+
+  init(data: MatchSceneData): void {
+    if (data.p1Color) this.p1Color = data.p1Color;
+    if (data.p2Color) this.p2Color = data.p2Color;
   }
 
   create(): void {
@@ -124,12 +138,12 @@ export class MatchScene extends Phaser.Scene {
   private createPlayers(): void {
     const gfx = this.add.graphics();
 
-    gfx.fillStyle(P1_COLOR);
+    gfx.fillStyle(P1_DEFAULT_HEX);
     gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
     gfx.generateTexture("p1_chicken", PLAYER_SIZE * 2, PLAYER_SIZE * 2);
 
     gfx.clear();
-    gfx.fillStyle(P2_COLOR);
+    gfx.fillStyle(P2_DEFAULT_HEX);
     gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
     gfx.generateTexture("p2_chicken", PLAYER_SIZE * 2, PLAYER_SIZE * 2);
 

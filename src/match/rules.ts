@@ -85,3 +85,33 @@ export function expirePeek(_state: PeekState): PeekState {
     peekStartedAtMs: null,
   };
 }
+
+export interface ClaimResult {
+  matchState: MatchState;
+  peekState: PeekState;
+  claimed: boolean;
+}
+
+export function attemptClaim(
+  matchState: MatchState,
+  peekState: PeekState,
+  playerIndex: 0 | 1,
+  currentTimeMs: number,
+): ClaimResult {
+  if (!isPeekActive(peekState, currentTimeMs)) {
+    return {
+      matchState,
+      peekState,
+      claimed: false,
+    };
+  }
+
+  const newMatchState = addScore(matchState, playerIndex, 1);
+  const newPeekState = expirePeek(peekState);
+
+  return {
+    matchState: newMatchState,
+    peekState: newPeekState,
+    claimed: true,
+  };
+}

@@ -9,6 +9,7 @@ import {
   isPeekActive,
   expirePeek,
   selectNextPeekSpot,
+  attemptClaim,
   DEFAULT_MATCH_DURATION_MS,
   DEFAULT_PEEK_DURATION_MS,
 } from "../src/match/rules";
@@ -170,5 +171,71 @@ describe("peek lifecycle", () => {
     state = expirePeek(state);
     expect(isPeekActive(state, 5000)).toBe(false);
     expect(state.activeSpotIndex).toBeNull();
+  });
+});
+
+describe("attemptClaim", () => {
+  it("scores one point for the claiming player and clears the peek", () => {
+    const match = createMatchState();
+    const peek = startPeek(createPeekState(), 2000, 1);
+    const result = attemptClaim(match, peek, 0, 2000);
+
+    expect(result.claimed).toBe(true);
+    expect(result.matchState.scores).toEqual([1, 0]);
+    expect(result.peekState.activeSpotIndex).toBeNull();
+  });
+
+  it("does not claim when no peek is active", () => {
+    const match = createMatchState();
+    const peek = createPeekState();
+    const result = attemptClaim(match, peek, 0, 1000);
+
+    expect(result.claimed).toBe(false);
+    expect(result.matchState.scores).toEqual([0, 0]);
+    expect(result.peekState.activeSpotIndex).toBeNull();
+  });
+
+  it("does not claim when the peek has expired", () => {
+    const match = createMatchState();
+    const peek = startPeek(createPeekState(), 1000, 2);
+    const result = attemptClaim(
+      match,
+      peek,
+      1,
+      1000 + DEFAULT_PEEK_DURATION_MS + 1,
+    );
+
+    expect(result.claimed).toBe(false);
+    expect(result.matchState.scores).toEqual([0, 0]);
+  });
+
+  it("cannot claim the same peek twice (duplicate prevention)", () => {
+    const match = createMatchState();
+    const peek = startPeek(createPeekState(), 3000, 0);
+    const first = attemptClaim(match, peek, 0, 3000);
+
+    expect(first.claimed).toBe(true);
+
+    const second = attemptClaim(first.matchState, first.peekState, 1, 3000);
+
+    expect(second.claimed).toBe(false);
+    expect(second.matchState.scores).toEqual([1, 0]);
+  });
+
+  it("accumulates scores across multiple claims", () => {
+    let match = createMatchState();
+
+    let peek = startPeek(createPeekState(), 1000, 0);
+    let result = attemptClaim(match, peek, 0, 1000);
+    match = result.matchState;
+
+    peek = startPeek(createPeekState(), 3000, 1);
+    result = attemptClaim(match, peek, 1, 3000);
+    match = result.matchState;
+
+    peek = startPeek(createPeekState(), 5000, 2);
+    result = attemptClaim(match, peek, 1, 5000);
+
+    expect(result.matchState.scores).toEqual([1, 2]);
   });
 });

@@ -238,6 +238,72 @@ test("Match scene renders Player Chicken textures and HUD in the selected colors
   expect(p2TextureColor).toEqual(EXPECTED_HEX.orange);
 });
 
+interface ProductionMatchDefaultsProbe {
+  durationMs: number;
+  elapsedMs: number;
+  timerText: string;
+  scores: [number, number];
+}
+
+function probeProductionMatchDefaults(
+  page: import("@playwright/test").Page,
+): Promise<ProductionMatchDefaultsProbe | null> {
+  return page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return null;
+    const match = scene as unknown as {
+      matchState: {
+        durationMs: number;
+        elapsedMs: number;
+        scores: [number, number];
+      };
+      timerText: { text: string };
+    };
+    return {
+      durationMs: match.matchState.durationMs,
+      elapsedMs: match.matchState.elapsedMs,
+      timerText: match.timerText.text,
+      scores: match.matchState.scores,
+    };
+  });
+}
+
+test("production Local Match defaults to a 90 second duration", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await expect
+    .poll(() => probeProductionMatchDefaults(page), { timeout: 2_000 })
+    .toMatchObject({
+      durationMs: 90_000,
+      scores: [0, 0],
+    });
+
+  const probe = await probeProductionMatchDefaults(page);
+  expect(probe).not.toBeNull();
+  const timerMatch = /^Time: (?<seconds>\d+\.\d)s$/.exec(probe!.timerText);
+  expect(timerMatch?.groups?.seconds).toBeDefined();
+  const displayedSeconds = Number(timerMatch!.groups!.seconds);
+  expect(displayedSeconds).toBeGreaterThanOrEqual(89.0);
+  expect(displayedSeconds).toBeLessThanOrEqual(90.0);
+});
+
 async function completeMatchForTest(
   page: import("@playwright/test").Page,
   scores: [number, number],

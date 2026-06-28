@@ -10,8 +10,14 @@ import {
   isPeekActive,
   getActiveNormalSpotIndices,
   attemptClaim,
+  createClaimAnimationState,
+  startClaimAnimation,
+  getActiveClaimAnimation,
+  tickClaimAnimations,
+  computeClaimPopScale,
   type MatchState,
   type PeekState,
+  type ClaimAnimationState,
   NORMAL_PEEK_COUNT,
 } from "../match/rules";
 import { FARMYARD_LAYOUT } from "../match/layout";
@@ -43,6 +49,7 @@ function hexToCssHex(value: number): string {
 export class MatchScene extends Phaser.Scene {
   private matchState!: MatchState;
   private peekState!: PeekState;
+  private claimAnimationState!: ClaimAnimationState;
   private timerText!: Phaser.GameObjects.Text;
   private p1ScoreText!: Phaser.GameObjects.Text;
   private p2ScoreText!: Phaser.GameObjects.Text;
@@ -77,6 +84,7 @@ export class MatchScene extends Phaser.Scene {
 
     this.matchState = createMatchState();
     this.peekState = createPeekState(0);
+    this.claimAnimationState = createClaimAnimationState();
     this.transitioned = false;
     this.chickBodies = [];
 
@@ -114,6 +122,10 @@ export class MatchScene extends Phaser.Scene {
       this.matchState.elapsedMs,
       FARMYARD_LAYOUT.hidingSpots.length,
       () => Math.random(),
+    );
+    this.claimAnimationState = tickClaimAnimations(
+      this.claimAnimationState,
+      this.matchState.elapsedMs,
     );
     this.renderChicks();
     this.updateHUD();
@@ -260,8 +272,13 @@ export class MatchScene extends Phaser.Scene {
     if (result.claimed) {
       this.matchState = result.matchState;
       this.peekState = result.peekState;
-      chickBody.body!.enable = false;
-      chickBody.setVisible(false);
+      this.claimAnimationState = startClaimAnimation(
+        this.claimAnimationState,
+        slotIndex,
+        slot.activeSpotIndex,
+        playerIndex,
+        this.matchState.elapsedMs,
+      );
       this.updateHUD();
     }
   }
@@ -380,20 +397,43 @@ export class MatchScene extends Phaser.Scene {
     for (let slotIndex = 0; slotIndex < NORMAL_PEEK_COUNT; slotIndex++) {
       const body = this.chickBodies[slotIndex]!;
       const peek = this.peekState.peeks[slotIndex]!;
-      if (
+      const claimAnimation = getActiveClaimAnimation(
+        this.claimAnimationState,
+        slotIndex,
+        now,
+      );
+
+      if (claimAnimation !== null) {
+        const spot = FARMYARD_LAYOUT.hidingSpots[claimAnimation.spotIndex]!;
+        const color = this.getPlayerColor(claimAnimation.playerIndex);
+        const scale = computeClaimPopScale(claimAnimation.startedAtMs, now);
+        body.setPosition(spot.x, spot.y);
+        body.setTint(color);
+        body.setScale(scale);
+        body.body!.enable = false;
+        body.setVisible(true);
+      } else if (
         peek.activeSpotIndex !== null &&
         isPeekActive(peek, now) &&
         activeSpots.has(peek.activeSpotIndex)
       ) {
         const spot = FARMYARD_LAYOUT.hidingSpots[peek.activeSpotIndex]!;
         body.setPosition(spot.x, spot.y);
+        body.setTint(0xffffff);
+        body.setScale(1);
         body.body!.enable = true;
         body.setVisible(true);
       } else if (body.visible) {
+        body.setTint(0xffffff);
+        body.setScale(1);
         body.body!.enable = false;
         body.setVisible(false);
       }
     }
+  }
+
+  private getPlayerColor(playerIndex: 0 | 1): number {
+    return getPlayerChickenHex(playerIndex === 0 ? this.p1Color : this.p2Color);
   }
 
   private drawBounds(): void {

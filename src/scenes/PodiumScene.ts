@@ -4,6 +4,12 @@ import {
   getPlayerChickenHex,
   type PlayerChickenColor,
 } from "../setup/colors";
+import {
+  playSfxMoment,
+  SFX_PODIUM_FANFARE,
+  type SfxScheduler,
+} from "../audio/sfx";
+import { createWebAudioScheduler } from "../audio/web-audio";
 
 interface PodiumData {
   scores?: [number, number];
@@ -64,6 +70,9 @@ function podiumBlockHex(label: "gold" | "silver" | "bronze"): number {
 }
 
 export class PodiumScene extends Phaser.Scene {
+  private sfxScheduler: SfxScheduler = { schedule: () => {} };
+  readonly playedSfx: Array<"podiumFanfare"> = [];
+
   constructor() {
     super("PodiumScene");
   }
@@ -75,12 +84,33 @@ export class PodiumScene extends Phaser.Scene {
     const p1Color: PlayerChickenColor = data?.p1Color ?? "blue";
     const p2Color: PlayerChickenColor = data?.p2Color ?? "red";
 
+    this.initAudio();
+    this.playSfx("podiumFanfare");
+
     this.drawPodiumBlocks();
     this.drawGround(width, height);
     this.placePlayers(winner, p1Color, p2Color);
     this.drawTitle(width);
     this.drawScores(width, height, p1Score, p2Score, p1Color, p2Color);
     this.drawResult(width, height, winner);
+  }
+
+  private initAudio(): void {
+    const sound = this.sound as Phaser.Sound.WebAudioSoundManager | null;
+    if (!sound || !sound.context) {
+      return;
+    }
+    this.sfxScheduler = createWebAudioScheduler(sound.context);
+  }
+
+  private audioNow(): number {
+    const sound = this.sound as Phaser.Sound.WebAudioSoundManager | null;
+    return sound?.context?.currentTime ?? 0;
+  }
+
+  private playSfx(id: "podiumFanfare"): void {
+    this.playedSfx.push(id);
+    playSfxMoment(this.sfxScheduler, SFX_PODIUM_FANFARE, this.audioNow());
   }
 
   private drawPodiumBlocks(): void {

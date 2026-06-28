@@ -32,6 +32,23 @@ import {
   getPlayerChickenHex,
   type PlayerChickenColor,
 } from "../setup/colors";
+import {
+  playSfxMoment,
+  SFX_NORMAL_CHICK_CLAIM,
+  SFX_GREEN_CHICK_APPEAR,
+  SFX_GREEN_CHICK_CLAIM,
+  type SfxScheduler,
+  type SfxMoment,
+} from "../audio/sfx";
+import { createWebAudioScheduler } from "../audio/web-audio";
+
+export type MatchSfxId = "normalClaim" | "greenChickAppear" | "greenChickClaim";
+
+const MATCH_SFX_MOMENTS: Record<MatchSfxId, SfxMoment> = {
+  normalClaim: SFX_NORMAL_CHICK_CLAIM,
+  greenChickAppear: SFX_GREEN_CHICK_APPEAR,
+  greenChickClaim: SFX_GREEN_CHICK_CLAIM,
+};
 
 const PLAYER_SIZE = 28;
 const CHICK_SIZE = 16;
@@ -70,6 +87,9 @@ export class MatchScene extends Phaser.Scene {
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
   private chickBodies: Phaser.Physics.Arcade.Sprite[] = [];
   private greenChickBody!: Phaser.Physics.Arcade.Sprite;
+  private sfxScheduler: SfxScheduler = { schedule: () => {} };
+  private sfxNow: () => number = () => 0;
+  readonly playedSfx: MatchSfxId[] = [];
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -99,6 +119,7 @@ export class MatchScene extends Phaser.Scene {
     this.claimAnimationState = createClaimAnimationState();
     this.transitioned = false;
     this.chickBodies = [];
+    this.initAudio();
 
     this.physics.world.setBounds(
       FARMYARD_LAYOUT.bounds.x,
@@ -142,6 +163,7 @@ export class MatchScene extends Phaser.Scene {
       FARMYARD_LAYOUT.hidingSpots.length,
       () => Math.random(),
     );
+    const previousGreenStatus = this.greenChickState.status;
     this.greenChickState = tickGreenChickState(
       this.greenChickState,
       this.peekState,
@@ -149,6 +171,12 @@ export class MatchScene extends Phaser.Scene {
       FARMYARD_LAYOUT.hidingSpots.length,
       () => Math.random(),
     );
+    if (
+      previousGreenStatus !== "active" &&
+      this.greenChickState.status === "active"
+    ) {
+      this.playSfx("greenChickAppear");
+    }
     this.claimAnimationState = tickClaimAnimations(
       this.claimAnimationState,
       this.matchState.elapsedMs,
@@ -169,6 +197,20 @@ export class MatchScene extends Phaser.Scene {
         });
       });
     }
+  }
+
+  private initAudio(): void {
+    const sound = this.sound as Phaser.Sound.WebAudioSoundManager | null;
+    if (!sound || !sound.context) {
+      return;
+    }
+    this.sfxScheduler = createWebAudioScheduler(sound.context);
+    this.sfxNow = () => sound.context.currentTime;
+  }
+
+  private playSfx(id: MatchSfxId): void {
+    this.playedSfx.push(id);
+    playSfxMoment(this.sfxScheduler, MATCH_SFX_MOMENTS[id], this.sfxNow());
   }
 
   private createHUD(width: number): void {
@@ -323,6 +365,7 @@ export class MatchScene extends Phaser.Scene {
         playerIndex,
         this.matchState.elapsedMs,
       );
+      this.playSfx("normalClaim");
       this.updateHUD();
     }
   }
@@ -342,6 +385,7 @@ export class MatchScene extends Phaser.Scene {
     if (result.claimed) {
       this.matchState = result.matchState;
       this.greenChickState = result.greenChickState;
+      this.playSfx("greenChickClaim");
       this.updateHUD();
     }
   }

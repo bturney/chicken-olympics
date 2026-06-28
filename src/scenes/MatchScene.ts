@@ -8,6 +8,7 @@ import {
   isPeekActive,
   expirePeek,
   selectNextPeekSpot,
+  attemptClaim,
   DEFAULT_MATCH_DURATION_MS,
   type MatchState,
   type PeekState,
@@ -31,7 +32,7 @@ export class MatchScene extends Phaser.Scene {
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
-  private chickSprite!: Phaser.GameObjects.Sprite;
+  private chickBody!: Phaser.Physics.Arcade.Sprite;
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -63,6 +64,7 @@ export class MatchScene extends Phaser.Scene {
     this.createChick();
     this.createHidingSpots();
     this.createInput();
+    this.createOverlaps();
     this.drawBounds();
 
     this.startNextPeek();
@@ -169,8 +171,46 @@ export class MatchScene extends Phaser.Scene {
     gfx.destroy();
 
     const firstSpot = FARMYARD_LAYOUT.hidingSpots[0]!;
-    this.chickSprite = this.add.sprite(firstSpot.x, firstSpot.y, "chick");
-    this.chickSprite.setVisible(false);
+    this.chickBody = this.physics.add.sprite(firstSpot.x, firstSpot.y, "chick");
+    this.chickBody.body!.enable = false;
+    this.chickBody.setVisible(false);
+    this.chickBody.setImmovable(true);
+  }
+
+  private createOverlaps(): void {
+    this.physics.add.overlap(this.p1Chicken, this.chickBody, () =>
+      this.handleClaim(0),
+    );
+
+    this.physics.add.overlap(this.p2Chicken, this.chickBody, () =>
+      this.handleClaim(1),
+    );
+  }
+
+  private handleClaim(playerIndex: 0 | 1): void {
+    if (!this.chickBody.visible) return;
+
+    const now = this.matchState.elapsedMs;
+    const claimResult = attemptClaim(
+      this.matchState,
+      this.peekState,
+      playerIndex,
+      now,
+    );
+
+    if (claimResult.claimed) {
+      this.matchState = claimResult.matchState;
+      this.peekState = claimResult.peekState;
+      this.chickBody.body!.enable = false;
+      this.chickBody.setVisible(false);
+      this.updateHUD();
+
+      this.time.delayedCall(500, () => {
+        if (!this.transitioned && !this.chickBody.visible) {
+          this.startNextPeek();
+        }
+      });
+    }
   }
 
   private createHidingSpots(): void {
@@ -218,20 +258,22 @@ export class MatchScene extends Phaser.Scene {
     this.peekState = startPeek(this.peekState, now, spotIndex);
 
     const spot = FARMYARD_LAYOUT.hidingSpots[spotIndex]!;
-    this.chickSprite.setPosition(spot.x, spot.y);
-    this.chickSprite.setVisible(true);
+    this.chickBody.setPosition(spot.x, spot.y);
+    this.chickBody.body!.enable = true;
+    this.chickBody.setVisible(true);
   }
 
   private updatePeek(): void {
     const now = this.matchState.elapsedMs;
 
     if (!isPeekActive(this.peekState, now)) {
-      if (this.chickSprite.visible) {
+      if (this.chickBody.visible) {
         this.peekState = expirePeek(this.peekState);
-        this.chickSprite.setVisible(false);
+        this.chickBody.body!.enable = false;
+        this.chickBody.setVisible(false);
 
         this.time.delayedCall(500, () => {
-          if (!this.transitioned) {
+          if (!this.transitioned && !this.chickBody.visible) {
             this.startNextPeek();
           }
         });

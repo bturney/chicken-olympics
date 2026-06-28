@@ -4,7 +4,13 @@ import {
   tick,
   addScore,
   getWinner,
+  createPeekState,
+  startPeek,
+  isPeekActive,
+  expirePeek,
+  selectNextPeekSpot,
   DEFAULT_MATCH_DURATION_MS,
+  DEFAULT_PEEK_DURATION_MS,
 } from "../src/match/rules";
 
 describe("createMatchState", () => {
@@ -106,5 +112,63 @@ describe("getWinner", () => {
     state = addScore(state, 1, 3);
 
     expect(getWinner(state)).toBeNull();
+  });
+});
+
+describe("selectNextPeekSpot", () => {
+  it("returns 0 when random value is at the start of the range", () => {
+    const spot = selectNextPeekSpot(4, 0);
+    expect(spot).toBe(0);
+  });
+
+  it("returns last spot when random value is near 1", () => {
+    const spot = selectNextPeekSpot(4, 0.999);
+    expect(spot).toBe(3);
+  });
+
+  it("returns different spots for different random values", () => {
+    const a = selectNextPeekSpot(4, 0.1);
+    const b = selectNextPeekSpot(4, 0.6);
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("peek lifecycle", () => {
+  it("starts with no active peek", () => {
+    const state = createPeekState();
+    expect(isPeekActive(state, 0)).toBe(false);
+  });
+
+  it("activates a peek at the given spot and time", () => {
+    const state = startPeek(createPeekState(), 1000, 2);
+    expect(isPeekActive(state, 1000)).toBe(true);
+    expect(state.activeSpotIndex).toBe(2);
+  });
+
+  it("deactivates a peek after the peek duration", () => {
+    const state = startPeek(createPeekState(), 1000, 1);
+    expect(isPeekActive(state, 1000)).toBe(true);
+    expect(isPeekActive(state, 1000 + DEFAULT_PEEK_DURATION_MS)).toBe(false);
+  });
+
+  it("deactivates a peek after the peek duration plus some", () => {
+    const state = startPeek(createPeekState(), 1000, 1);
+    expect(isPeekActive(state, 1000 + DEFAULT_PEEK_DURATION_MS + 1)).toBe(
+      false,
+    );
+  });
+
+  it("keeps a peek active before the duration expires", () => {
+    const state = startPeek(createPeekState(), 1000, 3);
+    expect(isPeekActive(state, 1000 + DEFAULT_PEEK_DURATION_MS - 1)).toBe(true);
+  });
+
+  it("expirePeek clears the active peek", () => {
+    let state = startPeek(createPeekState(), 1000, 1);
+    expect(isPeekActive(state, 1000)).toBe(true);
+
+    state = expirePeek(state);
+    expect(isPeekActive(state, 5000)).toBe(false);
+    expect(state.activeSpotIndex).toBeNull();
   });
 });

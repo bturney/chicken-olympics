@@ -3,18 +3,27 @@ import {
   createMatchState,
   tick,
   getWinner,
+  createPeekState,
+  startPeek,
+  isPeekActive,
+  expirePeek,
+  selectNextPeekSpot,
   DEFAULT_MATCH_DURATION_MS,
   type MatchState,
+  type PeekState,
 } from "../match/rules";
 import { FARMYARD_LAYOUT } from "../match/layout";
 
 const PLAYER_SIZE = 28;
+const CHICK_SIZE = 16;
 const P1_COLOR = 0x4488ff;
 const P2_COLOR = 0xff4444;
+const CHICK_COLOR = 0xffdd44;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
 export class MatchScene extends Phaser.Scene {
   private matchState!: MatchState;
+  private peekState!: PeekState;
   private timerText!: Phaser.GameObjects.Text;
   private p1ScoreText!: Phaser.GameObjects.Text;
   private p2ScoreText!: Phaser.GameObjects.Text;
@@ -22,6 +31,7 @@ export class MatchScene extends Phaser.Scene {
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
+  private chickSprite!: Phaser.GameObjects.Sprite;
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -38,6 +48,7 @@ export class MatchScene extends Phaser.Scene {
     const { width } = this.scale;
 
     this.matchState = createMatchState();
+    this.peekState = createPeekState();
     this.transitioned = false;
 
     this.physics.world.setBounds(
@@ -49,8 +60,12 @@ export class MatchScene extends Phaser.Scene {
 
     this.createHUD(width);
     this.createPlayers();
+    this.createChick();
+    this.createHidingSpots();
     this.createInput();
     this.drawBounds();
+
+    this.startNextPeek();
   }
 
   update(_time: number, delta: number): void {
@@ -58,6 +73,7 @@ export class MatchScene extends Phaser.Scene {
 
     this.handleMovement();
     this.matchState = tick(this.matchState, delta);
+    this.updatePeek();
     this.updateHUD();
 
     if (this.matchState.isComplete) {
@@ -145,6 +161,27 @@ export class MatchScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
+  private createChick(): void {
+    const gfx = this.add.graphics();
+    gfx.fillStyle(CHICK_COLOR);
+    gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
+    gfx.generateTexture("chick", CHICK_SIZE * 2, CHICK_SIZE * 2);
+    gfx.destroy();
+
+    const firstSpot = FARMYARD_LAYOUT.hidingSpots[0]!;
+    this.chickSprite = this.add.sprite(firstSpot.x, firstSpot.y, "chick");
+    this.chickSprite.setVisible(false);
+  }
+
+  private createHidingSpots(): void {
+    const spotGfx = this.add.graphics();
+    spotGfx.lineStyle(2, 0x88aa88, 0.5);
+
+    for (const spot of FARMYARD_LAYOUT.hidingSpots) {
+      spotGfx.strokeCircle(spot.x, spot.y, CHICK_SIZE + 6);
+    }
+  }
+
   private createInput(): void {
     this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as {
       W: Phaser.Input.Keyboard.Key;
@@ -171,6 +208,35 @@ export class MatchScene extends Phaser.Scene {
       (this.arrows.down.isDown ? MOVE_SPEED : 0) -
       (this.arrows.up.isDown ? MOVE_SPEED : 0);
     this.p2Chicken.setVelocity(p2Vx, p2Vy);
+  }
+
+  private startNextPeek(): void {
+    const now = this.matchState.elapsedMs;
+    const spotCount = FARMYARD_LAYOUT.hidingSpots.length;
+    const rng = Math.random();
+    const spotIndex = selectNextPeekSpot(spotCount, rng);
+    this.peekState = startPeek(this.peekState, now, spotIndex);
+
+    const spot = FARMYARD_LAYOUT.hidingSpots[spotIndex]!;
+    this.chickSprite.setPosition(spot.x, spot.y);
+    this.chickSprite.setVisible(true);
+  }
+
+  private updatePeek(): void {
+    const now = this.matchState.elapsedMs;
+
+    if (!isPeekActive(this.peekState, now)) {
+      if (this.chickSprite.visible) {
+        this.peekState = expirePeek(this.peekState);
+        this.chickSprite.setVisible(false);
+
+        this.time.delayedCall(500, () => {
+          if (!this.transitioned) {
+            this.startNextPeek();
+          }
+        });
+      }
+    }
   }
 
   private drawBounds(): void {

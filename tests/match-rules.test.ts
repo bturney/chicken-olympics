@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   createMatchState,
   tick,
+  isMatchComplete,
+  getRemainingMs,
   addScore,
   getWinner,
   createPeekState,
@@ -10,7 +12,7 @@ import {
   expirePeek,
   selectNextPeekSpot,
   attemptClaim,
-  DEFAULT_MATCH_DURATION_MS,
+  PRODUCTION_MATCH_DURATION_MS,
   DEFAULT_PEEK_DURATION_MS,
 } from "../src/match/rules";
 
@@ -27,10 +29,23 @@ describe("createMatchState", () => {
     expect(state.elapsedMs).toBe(0);
   });
 
-  it("initializes match as not complete", () => {
+  it("defaults the production match duration to 90 seconds", () => {
     const state = createMatchState();
 
-    expect(state.isComplete).toBe(false);
+    expect(state.durationMs).toBe(PRODUCTION_MATCH_DURATION_MS);
+    expect(PRODUCTION_MATCH_DURATION_MS).toBe(90_000);
+  });
+
+  it("honours a custom duration override from the caller", () => {
+    const state = createMatchState({ durationMs: 5_000 });
+
+    expect(state.durationMs).toBe(5_000);
+  });
+
+  it("is not complete on creation", () => {
+    const state = createMatchState();
+
+    expect(isMatchComplete(state)).toBe(false);
   });
 });
 
@@ -44,23 +59,61 @@ describe("tick", () => {
 
   it("does not mark the match complete before duration is reached", () => {
     const state = createMatchState();
-    const next = tick(state, DEFAULT_MATCH_DURATION_MS - 1);
+    const next = tick(state, PRODUCTION_MATCH_DURATION_MS - 1);
 
-    expect(next.isComplete).toBe(false);
+    expect(isMatchComplete(next)).toBe(false);
   });
 
   it("marks the match complete when elapsed reaches the duration", () => {
     const state = createMatchState();
-    const next = tick(state, DEFAULT_MATCH_DURATION_MS);
+    const next = tick(state, PRODUCTION_MATCH_DURATION_MS);
 
-    expect(next.isComplete).toBe(true);
+    expect(isMatchComplete(next)).toBe(true);
   });
 
   it("marks the match complete when elapsed exceeds the duration", () => {
     const state = createMatchState();
-    const next = tick(state, DEFAULT_MATCH_DURATION_MS + 1);
+    const next = tick(state, PRODUCTION_MATCH_DURATION_MS + 1);
 
-    expect(next.isComplete).toBe(true);
+    expect(isMatchComplete(next)).toBe(true);
+  });
+
+  it("completes the match at the custom override duration, not the production default", () => {
+    const state = createMatchState({ durationMs: 5_000 });
+    const before = tick(state, 4_999);
+    const atDuration = tick(state, 5_000);
+
+    expect(state.durationMs).toBe(5_000);
+    expect(isMatchComplete(before)).toBe(false);
+    expect(isMatchComplete(atDuration)).toBe(true);
+  });
+});
+
+describe("getRemainingMs", () => {
+  it("returns the full duration at match start", () => {
+    const state = createMatchState();
+
+    expect(getRemainingMs(state)).toBe(state.durationMs);
+  });
+
+  it("decreases as time advances", () => {
+    const state = createMatchState();
+    const next = tick(state, 10_000);
+
+    expect(getRemainingMs(next)).toBe(state.durationMs - 10_000);
+  });
+
+  it("clamps to zero once the duration is exceeded", () => {
+    const state = createMatchState({ durationMs: 1_000 });
+    const next = tick(state, 2_500);
+
+    expect(getRemainingMs(next)).toBe(0);
+  });
+
+  it("honours a custom duration override", () => {
+    const state = createMatchState({ durationMs: 5_000 });
+
+    expect(getRemainingMs(state)).toBe(5_000);
   });
 });
 

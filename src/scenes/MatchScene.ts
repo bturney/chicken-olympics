@@ -2,6 +2,8 @@ import Phaser from "phaser";
 import {
   createMatchState,
   tick,
+  isMatchComplete,
+  getRemainingMs,
   getWinner,
   createPeekState,
   startPeek,
@@ -9,7 +11,6 @@ import {
   expirePeek,
   selectNextPeekSpot,
   attemptClaim,
-  DEFAULT_MATCH_DURATION_MS,
   type MatchState,
   type PeekState,
 } from "../match/rules";
@@ -78,7 +79,7 @@ export class MatchScene extends Phaser.Scene {
     this.updatePeek();
     this.updateHUD();
 
-    if (this.matchState.isComplete) {
+    if (isMatchComplete(this.matchState)) {
       this.transitioned = true;
       this.time.delayedCall(500, () => {
         const winner = getWinner(this.matchState);
@@ -289,10 +290,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private updateHUD(): void {
-    const remaining = Math.max(
-      0,
-      DEFAULT_MATCH_DURATION_MS - this.matchState.elapsedMs,
-    );
+    const remaining = getRemainingMs(this.matchState);
     const seconds = (remaining / 1000).toFixed(1);
     this.timerText.setText(`Time: ${seconds}s`);
 

@@ -1,26 +1,36 @@
-export interface MatchState {
-  scores: [number, number];
-  elapsedMs: number;
-  isComplete: boolean;
+export interface MatchOptions {
+  durationMs?: number;
 }
 
-export const DEFAULT_MATCH_DURATION_MS = 15_000;
+export interface MatchState {
+  durationMs: number;
+  scores: [number, number];
+  elapsedMs: number;
+}
 
-export function createMatchState(): MatchState {
+export const PRODUCTION_MATCH_DURATION_MS = 90_000;
+
+export function createMatchState(options: MatchOptions = {}): MatchState {
   return {
+    durationMs: options.durationMs ?? PRODUCTION_MATCH_DURATION_MS,
     scores: [0, 0],
     elapsedMs: 0,
-    isComplete: false,
   };
 }
 
 export function tick(state: MatchState, deltaMs: number): MatchState {
-  const elapsedMs = state.elapsedMs + deltaMs;
   return {
     ...state,
-    elapsedMs,
-    isComplete: elapsedMs >= DEFAULT_MATCH_DURATION_MS,
+    elapsedMs: state.elapsedMs + deltaMs,
   };
+}
+
+export function isMatchComplete(state: MatchState): boolean {
+  return state.elapsedMs >= state.durationMs;
+}
+
+export function getRemainingMs(state: MatchState): number {
+  return Math.max(0, state.durationMs - state.elapsedMs);
 }
 
 export function addScore(

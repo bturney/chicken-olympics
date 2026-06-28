@@ -93,6 +93,7 @@ export class PodiumScene extends Phaser.Scene {
     this.drawTitle(width);
     this.drawScores(width, height, p1Score, p2Score, p1Color, p2Color);
     this.drawResult(width, height, winner);
+    this.drawPlayAgainButton(width, height);
   }
 
   private initAudio(): void {
@@ -253,7 +254,7 @@ export class PodiumScene extends Phaser.Scene {
     this.add
       .text(
         width / 2,
-        height - 110,
+        height - 135,
         `Player 1 (${getPlayerChickenColorLabel(p1Color)}): ${p1Score}`,
         {
           fontSize: "20px",
@@ -265,7 +266,7 @@ export class PodiumScene extends Phaser.Scene {
     this.add
       .text(
         width / 2,
-        height - 70,
+        height - 100,
         `Player 2 (${getPlayerChickenColorLabel(p2Color)}): ${p2Score}`,
         {
           fontSize: "20px",
@@ -290,11 +291,29 @@ export class PodiumScene extends Phaser.Scene {
     }
 
     this.add
-      .text(width / 2, height - 30, result, {
+      .text(width / 2, height - 60, result, {
         fontSize: "26px",
         color: "#ffffff",
       })
       .setOrigin(0.5);
+  }
+
+  private drawPlayAgainButton(width: number, height: number): void {
+    const button = this.add
+      .text(width / 2, height - 20, "[ Play Again ]", {
+        fontSize: "20px",
+        color: "#44ff44",
+        backgroundColor: "#333355",
+        padding: { x: 16, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    button.on("pointerover", () => button.setColor("#88ff88"));
+    button.on("pointerout", () => button.setColor("#44ff44"));
+    button.on("pointerdown", () => {
+      this.scene.start("SetupScene");
+    });
   }
 }
 

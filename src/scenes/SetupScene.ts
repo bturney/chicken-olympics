@@ -31,6 +31,9 @@ export class SetupScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.selection = { p1: null, p2: null };
+    this.swatches = [];
+
     const { width } = this.scale;
 
     this.add

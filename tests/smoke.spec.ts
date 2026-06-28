@@ -952,3 +952,64 @@ test("Podium Ceremony queues a celebratory SFX fanfare on entry", async ({
       podium: expect.arrayContaining(["podiumFanfare"]),
     });
 });
+
+async function completeShortMatchForTest(
+  page: import("@playwright/test").Page,
+  scores: [number, number],
+  durationMs: number,
+): Promise<void> {
+  await page.evaluate(
+    ({ nextScores, durationMs }) => {
+      const game = window.__CHICKEN_OLYMPICS__;
+      if (!game) return;
+      const scene = game.scene.getScene("MatchScene");
+      if (!scene) return;
+      const match = scene as unknown as {
+        matchState: {
+          durationMs: number;
+          elapsedMs: number;
+          scores: [number, number];
+        };
+      };
+      match.matchState = {
+        ...match.matchState,
+        durationMs,
+        elapsedMs: durationMs,
+        scores: nextScores,
+      };
+    },
+    { nextScores: scores, durationMs },
+  );
+}
+
+test("Play Again on the Podium Ceremony returns to setup with a fresh Player Chicken color selection", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await completeShortMatchForTest(page, [3, 1], 2_000);
+
+  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
+
+  await canvas.click({ position: { x: 400 * scaleX, y: 580 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  for (const color of ["blue", "red", "purple", "orange"] as const) {
+    expect(await getSwatchEnabled(page, 0, color)).toBe(true);
+    expect(await getSwatchEnabled(page, 1, color)).toBe(true);
+  }
+});

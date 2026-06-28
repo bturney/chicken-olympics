@@ -1,0 +1,1 @@
+/home/benturney/src/agency-agents/integrations/opencode/agents/solidity-smart-contract-engineer.md

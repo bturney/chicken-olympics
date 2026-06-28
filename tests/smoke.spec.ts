@@ -797,3 +797,158 @@ test("Green Chick does not return after the match continues past its expiry", as
     .poll(() => probeGreenChick(page), { timeout: 2_000 })
     .toMatchObject({ greenChickState: { status: "claimed" } });
 });
+
+function probePlayedSfx(page: import("@playwright/test").Page): Promise<{
+  match: string[];
+  podium: string[];
+} | null> {
+  return page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const match = game.scene.getScene("MatchScene") as unknown as {
+      playedSfx?: string[];
+    } | null;
+    const podium = game.scene.getScene("PodiumScene") as unknown as {
+      playedSfx?: string[];
+    } | null;
+    return {
+      match: match?.playedSfx ?? [],
+      podium: podium?.playedSfx ?? [],
+    };
+  });
+}
+
+test("claiming a normal Chick queues a distinct SFX for the normal claim", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await expect
+    .poll(async () => (await probeClaimFeedback(page))?.chickBodies.length, {
+      timeout: 2_000,
+    })
+    .toBe(3);
+
+  await movePlayerOntoActiveChick(page, 0);
+
+  await expect
+    .poll(() => probePlayedSfx(page), { timeout: 2_000 })
+    .toMatchObject({
+      match: expect.arrayContaining(["normalClaim"]),
+    });
+});
+
+async function scheduleGreenChickToAppearNow(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return;
+    const match = scene as unknown as {
+      greenChickState: {
+        status: string;
+        scheduledAtMs: number;
+        activeSpotIndex: number | null;
+        peekStartedAtMs: number | null;
+        claimedAtMs: number | null;
+        claimedByPlayerIndex: 0 | 1 | null;
+      };
+    };
+    match.greenChickState = {
+      status: "pending",
+      scheduledAtMs: 0,
+      activeSpotIndex: null,
+      peekStartedAtMs: null,
+      claimedAtMs: null,
+      claimedByPlayerIndex: null,
+    };
+  });
+}
+
+test("Green Chick appearance and claim queue distinct SFX events", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await scheduleGreenChickToAppearNow(page);
+
+  await expect
+    .poll(() => probePlayedSfx(page), { timeout: 2_000 })
+    .toMatchObject({
+      match: expect.arrayContaining(["greenChickAppear"]),
+    });
+
+  await page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return;
+    const match = scene as unknown as {
+      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
+    };
+    match.handleGreenChickClaim(0);
+  });
+
+  await expect
+    .poll(() => probePlayedSfx(page), { timeout: 2_000 })
+    .toMatchObject({
+      match: expect.arrayContaining(["greenChickAppear", "greenChickClaim"]),
+    });
+});
+
+test("Podium Ceremony queues a celebratory SFX fanfare on entry", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await completeMatchForTest(page, [1, 0]);
+
+  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
+
+  await expect
+    .poll(() => probePlayedSfx(page), { timeout: 2_000 })
+    .toMatchObject({
+      podium: expect.arrayContaining(["podiumFanfare"]),
+    });
+});

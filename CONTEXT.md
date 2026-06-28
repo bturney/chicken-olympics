@@ -21,7 +21,7 @@ The end-of-match screen that shows the final scores and celebrates the winner on
 _Avoid_: Results screen, game over screen
 
 **Player Chicken**:
-The non-green colored chicken chosen by a player for a match.
+The non-green, non-yellow colored chicken chosen by a player for a match.
 _Avoid_: Avatar, character, chicken color
 
 **Chicken Cursor**:

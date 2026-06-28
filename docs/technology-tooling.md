@@ -21,18 +21,18 @@ Chicken Olympics will start as a static browser game optimized for a two-player 
 ## Testing and Quality
 
 - TypeScript: strict mode.
-- Unit tests: Vitest for pure match rules and state helpers.
-- Browser smoke test: Playwright verifies the game loads and shows the initial canvas/title.
+- Unit tests: Vitest for the pure match engine, including timing, active peeks, green chick scheduling, scoring, and winner calculation.
+- Browser smoke flow: Playwright verifies the game loads and can move from setup through match completion to the podium ceremony without asserting detailed canvas gameplay.
 - Linting: ESLint.
 - Formatting: Prettier.
 - CI: GitHub Actions runs install, typecheck, lint, Vitest, Playwright smoke test, and Vite build.
 
 ## Assets and Layout
 
-- Assets: committed PNG/SVG files, with simple placeholder art acceptable for the first playable.
-- No texture atlas pipeline, Spine, Tiled, or custom asset build step initially.
+- Assets: programmatically drawn Phaser graphics for the MVP.
+- No texture atlas pipeline, Spine, Tiled, committed art assets, or custom asset build step initially.
 - Farmyard Stadium layout: typed TypeScript layout config for arena bounds and hiding spot positions/types.
-- Audio: no separate audio tooling; if sounds are added later, use Phaser's built-in audio support with committed files.
+- Audio: generated sound effects in code for the MVP; no committed audio files or separate audio tooling.
 
 ## Deployment
 

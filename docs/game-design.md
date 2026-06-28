@@ -11,21 +11,24 @@ Build a simple first playable version of Chicken Olympics: a 2-player local matc
 - Match length: 90 seconds.
 - Players: Player 1 and Player 2.
 - Controls: Player 1 moves with `WASD`; Player 2 moves with arrow keys.
+- Movement: diagonal movement is normalized so it is not faster than straight movement.
 - Claiming: a player claims a peeking chick automatically by touching it with their chicken cursor.
+- Claim tie behavior: the first valid touch processed claims the chick; the MVP does not arbitrate simultaneous touches.
+- Sound: generated sound effects play for normal claims, green chick appearance, green chick claims, and the podium ceremony.
 - Win condition: most points when the timer reaches zero.
 
 ## Setup Flow
 
 1. Show the Chicken Olympics title screen.
-2. Player 1 chooses a non-green chicken color from buttons.
-3. Player 2 chooses a different non-green chicken color from buttons.
+2. Player 1 chooses a chicken color from blue, red, purple, and orange buttons.
+3. Player 2 chooses a different chicken color from the remaining buttons.
 4. Start the local match.
 
-Green is reserved for the green chick and should not be available as a player chicken color.
+Green is reserved for the green chick and yellow is reserved for normal chicks, so neither should be available as a player chicken color.
 
 ## Arena
 
-The arena is a farmyard stadium: an Olympic-style stadium with a farmyard as the field.
+The arena is a farmyard stadium: an Olympic-style stadium with a farmyard as the field. The MVP uses a fixed authored layout with several visible hiding spots; it does not use procedural spot placement or obstacle collision.
 
 Use visible hiding spots such as:
 
@@ -45,7 +48,8 @@ Chicks only peek from hiding spots. They do not appear randomly anywhere on the 
 3. If no player touches the chick before the peek ends, it hides again.
 4. If a player touches the chick, it turns into that player's color, scores once, does a tiny happy pop, and disappears.
 5. The hiding spot becomes available for a future chick.
-6. The players keep racing until the 90-second timer ends.
+6. Replacement normal chicks peek after a random delay between 500ms and 1500ms.
+7. The players keep racing until the 90-second timer ends.
 
 ## Scoring
 
@@ -59,7 +63,9 @@ Chicks only peek from hiding spots. They do not appear randomly anywhere on the 
 The green chick is a once-per-match rare chick.
 
 - It appears once at a random hiding spot.
-- It appears at a random time after the first 20 seconds.
+- It appears at a random scheduled time between 20 seconds and 70 seconds in a 90-second match.
+- It appears as an extra peek alongside the three normal yellow chicks when a hiding spot is free.
+- If no hiding spot is free at its scheduled time, it waits for the next free hiding spot.
 - It peeks like a normal chick.
 - It is worth 5 points if claimed.
 - If nobody claims it, it hides and does not return during that match.
@@ -71,7 +77,7 @@ When time runs out, show a podium ceremony.
 - Winner chicken on the gold podium.
 - Other chicken on the silver podium.
 - Final score for both players.
-- `Play Again` button.
+- `Play Again` button that returns to the setup screen for a fresh color selection.
 - If tied, show both chickens sharing the gold podium.
 
 ## First Build Acceptance Checklist
@@ -94,4 +100,4 @@ When time runs out, show a podium ceremony.
 - Speed upgrade for the winner.
 - Longer-peek upgrade where chicks stay visible longer for one player.
 - More farmyard stadium themes.
-- Sound effects for peeking, claiming, green chick appearance, and podium ceremony.
+- More detailed sound effects and music.

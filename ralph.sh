@@ -97,16 +97,26 @@ issue_title() {
   gh api "repos/$repo/issues/$1" --jq '.title'
 }
 
-issue_is_complete() {
+prd_comments() {
+  issue_comments "$prd_number"
+}
+
+prd_marks_slice_complete() {
   local issue_number="$1"
   local comments
+
+  comments="$(prd_comments)"
+  [[ "$comments" == *"<!-- ralph:slice-complete issue=$issue_number"* ]]
+}
+
+issue_is_complete() {
+  local issue_number="$1"
 
   if [[ "$(issue_state "$issue_number")" == "closed" ]]; then
     return 0
   fi
 
-  comments="$(issue_comments "$issue_number")"
-  [[ "$comments" == *'Ralph slice complete'* || "$comments" == *'<promise>SLICE_COMPLETE</promise>'* || "$comments" =~ [Ss]tatus:[[:space:]]+[Cc]omplete ]]
+  prd_marks_slice_complete "$issue_number"
 }
 
 parent_slice_numbers() {
@@ -195,10 +205,10 @@ responsible for starting the next slice in a fresh OpenCode run.
 
 1. Read AGENTS.md, CONTEXT.md, docs/agents/issue-tracker.md, docs/agents/triage-labels.md, the PRD issue, its labels, and its comments.
 2. Read only the active slice issue selected above. Do not discover, choose, implement, verify, commit, or comment on any other slice issue.
-3. Use the PRD comments as the overall progress log, and the active slice issue comments as the slice progress log. Read prior Ralph/progress comments before deciding what remains in the active slice.
-4. If the active slice is blocked, needs human input, or lacks enough information, add a short comment to the active slice explaining the state and output RALPH_STATUS=BLOCKED or RALPH_STATUS=NEEDS_INFO.
+3. Use only the PRD comments as Ralph's progress log. Read prior Ralph/progress comments on the PRD before deciding what remains in the active slice; do not use slice issue comments as progress state.
+4. If the active slice is blocked, needs human input, or lacks enough information, add a short comment to the PRD explaining the state, reference the active slice, include "<!-- ralph:slice-blocked issue=$active_slice -->" or "<!-- ralph:slice-needs-info issue=$active_slice -->", and output RALPH_STATUS=BLOCKED or RALPH_STATUS=NEEDS_INFO.
 5. Otherwise, execute only the active slice by using /tdd. Pass the PRD and active slice issue context into the skill.
-6. After the skill finishes, run appropriate verification, make one commit for the completed active slice, then comment on the active slice with concise progress, result, verification, and commit hash. Include the exact line "Ralph slice complete" in that comment so the outer script can skip it in future iterations.
+6. After the skill finishes, run appropriate verification, make one commit for the completed active slice, then comment on the PRD with concise progress, result, verification, active slice number, and commit hash. Include the exact line "<!-- ralph:slice-complete issue=$active_slice -->" in that PRD comment so the outer script can skip it in future iterations.
 7. Stop after that one completed slice and output RALPH_STATUS=SLICE_COMPLETE. Do not inspect or start the next slice.
 8. Your final response must end with exactly one status line: RALPH_STATUS=SLICE_COMPLETE, RALPH_STATUS=BLOCKED, or RALPH_STATUS=NEEDS_INFO.
 
@@ -253,8 +263,8 @@ PROMPT
     printf 'Ralph needs human input; exiting.\n'
     exit 0
   elif [[ "$result" == *'RALPH_STATUS=SLICE_COMPLETE'* ]]; then
-    if [[ -n "$active_slice" ]] && ! issue_is_complete "$active_slice"; then
-      printf 'OpenCode reported slice completion, but slice #%s does not have a completion marker comment; exiting for review.\n' "$active_slice" >&2
+    if [[ -n "$active_slice" ]] && ! prd_marks_slice_complete "$active_slice"; then
+      printf 'OpenCode reported slice completion, but PRD #%s does not have a completion marker comment for slice #%s; exiting for review.\n' "$prd_number" "$active_slice" >&2
       exit 1
     fi
     printf 'Slice complete; continuing to next iteration if any remain.\n'

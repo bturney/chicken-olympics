@@ -189,17 +189,18 @@ Active slice: $repo#$active_slice - $active_slice_title
 
 Ralph iteration contract: this run may complete at most one implementation slice.
 After completing, verifying, committing, and commenting on one slice, stop immediately
-and output <promise>SLICE_COMPLETE</promise>. Do not choose, implement, verify,
+and output RALPH_STATUS=SLICE_COMPLETE. Do not choose, implement, verify,
 commit, or comment on any additional slice in this run. The outer ralph.sh loop is
 responsible for starting the next slice in a fresh OpenCode run.
 
 1. Read AGENTS.md, CONTEXT.md, docs/agents/issue-tracker.md, docs/agents/triage-labels.md, the PRD issue, its labels, and its comments.
 2. Read only the active slice issue selected above. Do not discover, choose, implement, verify, commit, or comment on any other slice issue.
 3. Use the PRD comments as the overall progress log, and the active slice issue comments as the slice progress log. Read prior Ralph/progress comments before deciding what remains in the active slice.
-4. If the active slice is already complete, blocked, needs human input, or lacks enough information, add a short comment to the active slice explaining the state and output <promise>COMPLETE</promise>.
+4. If the active slice is blocked, needs human input, or lacks enough information, add a short comment to the active slice explaining the state and output RALPH_STATUS=BLOCKED or RALPH_STATUS=NEEDS_INFO.
 5. Otherwise, execute only the active slice by using /tdd. Pass the PRD and active slice issue context into the skill.
 6. After the skill finishes, run appropriate verification, make one commit for the completed active slice, then comment on the active slice with concise progress, result, verification, and commit hash. Include the exact line "Ralph slice complete" in that comment so the outer script can skip it in future iterations.
-7. Stop after that one completed slice and output <promise>SLICE_COMPLETE</promise>. Do not inspect or start the next slice.
+7. Stop after that one completed slice and output RALPH_STATUS=SLICE_COMPLETE. Do not inspect or start the next slice.
+8. Your final response must end with exactly one status line: RALPH_STATUS=SLICE_COMPLETE, RALPH_STATUS=BLOCKED, or RALPH_STATUS=NEEDS_INFO.
 
 Nonnegotiables: follow repo AGENTS.md files, do not push, do not rebase, do not touch unrelated user changes, and do not close issues directly unless the issue explicitly says to.
 PROMPT
@@ -215,8 +216,10 @@ The outer ralph.sh loop found no ready unfinished slice issues whose "## Parent"
 1. Read AGENTS.md, CONTEXT.md, docs/agents/issue-tracker.md, docs/agents/triage-labels.md, the PRD issue, its labels, and its comments.
 2. Do not implement code in this run.
 3. Determine whether the PRD is complete, blocked, waiting for human input, missing required information, or needs slice issues created before implementation can continue.
-4. If the PRD is complete, blocked, waiting for human input, or missing required information, add a concise PRD comment explaining the state and output <promise>COMPLETE</promise>.
-5. If the PRD needs slice decomposition, create /to-issues-style slice issues with "## Parent" referencing $repo#$prd_number and "## Blocked by" sections, then output <promise>SLICE_COMPLETE</promise>. Do not implement those slices in this run.
+4. If the PRD is complete, add a concise PRD comment explaining the state and output RALPH_STATUS=PRD_COMPLETE.
+5. If the PRD is blocked, waiting for human input, missing required information, or needs slice issues created before implementation can continue, add a concise PRD comment explaining the state and output RALPH_STATUS=BLOCKED or RALPH_STATUS=NEEDS_INFO.
+6. Do not create new slice issues in this run. Slice decomposition is a separate human-approved /to-issues step.
+7. Your final response must end with exactly one status line: RALPH_STATUS=PRD_COMPLETE, RALPH_STATUS=BLOCKED, or RALPH_STATUS=NEEDS_INFO.
 
 Nonnegotiables: follow repo AGENTS.md files, do not push, do not rebase, do not touch unrelated user changes, and do not close issues directly unless the issue explicitly says to.
 PROMPT
@@ -240,11 +243,24 @@ PROMPT
 
   printf '%s\n' "$result"
 
-  if [[ "$result" == *'<promise>COMPLETE</promise>'* ]]; then
-    printf 'Issue complete or blocked; exiting.\n'
+  if [[ "$result" == *'RALPH_STATUS=PRD_COMPLETE'* ]]; then
+    printf 'PRD complete; exiting.\n'
     exit 0
-  elif [[ "$result" == *'<promise>SLICE_COMPLETE</promise>'* ]]; then
+  elif [[ "$result" == *'RALPH_STATUS=BLOCKED'* ]]; then
+    printf 'Ralph blocked; exiting.\n'
+    exit 0
+  elif [[ "$result" == *'RALPH_STATUS=NEEDS_INFO'* ]]; then
+    printf 'Ralph needs human input; exiting.\n'
+    exit 0
+  elif [[ "$result" == *'RALPH_STATUS=SLICE_COMPLETE'* ]]; then
+    if [[ -n "$active_slice" ]] && ! issue_is_complete "$active_slice"; then
+      printf 'OpenCode reported slice completion, but slice #%s does not have a completion marker comment; exiting for review.\n' "$active_slice" >&2
+      exit 1
+    fi
     printf 'Slice complete; continuing to next iteration if any remain.\n'
+  else
+    printf 'OpenCode did not report a recognized RALPH_STATUS; exiting for review.\n' >&2
+    exit 1
   fi
 done
 

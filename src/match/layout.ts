@@ -3,11 +3,28 @@ export interface Position {
   y: number;
 }
 
+export type HidingSpotType =
+  "bush" | "hay-bale" | "barrel" | "flower-pot" | "fence" | "nest-box";
+
+export const HIDING_SPOT_TYPES: readonly HidingSpotType[] = [
+  "bush",
+  "hay-bale",
+  "barrel",
+  "flower-pot",
+  "fence",
+  "nest-box",
+] as const;
+
+export interface HidingSpot extends Position {
+  type: HidingSpotType;
+  name: string;
+}
+
 export interface FarmyardLayout {
   bounds: { x: number; y: number; width: number; height: number };
   playerStartPositions: [Position, Position];
   playerSpeed: number;
-  hidingSpots: Position[];
+  hidingSpots: HidingSpot[];
 }
 
 export const FARMYARD_LAYOUT: FarmyardLayout = {
@@ -23,9 +40,11 @@ export const FARMYARD_LAYOUT: FarmyardLayout = {
   ],
   playerSpeed: 200,
   hidingSpots: [
-    { x: 160, y: 180 },
-    { x: 480, y: 180 },
-    { x: 640, y: 380 },
-    { x: 320, y: 420 },
+    { x: 140, y: 180, type: "bush", name: "Northwest Bush" },
+    { x: 400, y: 150, type: "hay-bale", name: "North Hay Bale" },
+    { x: 680, y: 200, type: "barrel", name: "Northeast Barrel" },
+    { x: 200, y: 470, type: "flower-pot", name: "Southwest Flower Pot" },
+    { x: 560, y: 490, type: "fence", name: "South Fence" },
+    { x: 400, y: 400, type: "nest-box", name: "Center Nest Box" },
   ],
 };

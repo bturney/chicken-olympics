@@ -230,10 +230,73 @@ export class MatchScene extends Phaser.Scene {
 
   private createHidingSpots(): void {
     const spotGfx = this.add.graphics();
-    spotGfx.lineStyle(2, 0x88aa88, 0.5);
 
     for (const spot of FARMYARD_LAYOUT.hidingSpots) {
-      spotGfx.strokeCircle(spot.x, spot.y, CHICK_SIZE + 6);
+      switch (spot.type) {
+        case "bush":
+          spotGfx.fillStyle(0x3a8a3a, 1);
+          spotGfx.fillCircle(spot.x, spot.y, CHICK_SIZE + 6);
+          spotGfx.fillStyle(0x66cc66, 1);
+          spotGfx.fillCircle(spot.x - 4, spot.y - 4, 6);
+          spotGfx.fillCircle(spot.x + 6, spot.y + 2, 5);
+          break;
+        case "hay-bale":
+          spotGfx.fillStyle(0xd9b066, 1);
+          spotGfx.fillRoundedRect(spot.x - 22, spot.y - 12, 44, 24, 4);
+          spotGfx.lineStyle(2, 0xa37a3a, 1);
+          spotGfx.beginPath();
+          spotGfx.moveTo(spot.x - 18, spot.y - 6);
+          spotGfx.lineTo(spot.x + 18, spot.y - 6);
+          spotGfx.moveTo(spot.x - 18, spot.y + 6);
+          spotGfx.lineTo(spot.x + 18, spot.y + 6);
+          spotGfx.strokePath();
+          break;
+        case "barrel":
+          spotGfx.fillStyle(0x8a4a2a, 1);
+          spotGfx.fillRoundedRect(spot.x - 14, spot.y - 18, 28, 36, 4);
+          spotGfx.fillStyle(0x5a3015, 1);
+          spotGfx.fillRect(spot.x - 14, spot.y - 8, 28, 4);
+          spotGfx.fillRect(spot.x - 14, spot.y + 4, 28, 4);
+          break;
+        case "flower-pot":
+          spotGfx.fillStyle(0xc04a2a, 1);
+          spotGfx.beginPath();
+          spotGfx.moveTo(spot.x - 14, spot.y);
+          spotGfx.lineTo(spot.x + 14, spot.y);
+          spotGfx.lineTo(spot.x + 10, spot.y + 16);
+          spotGfx.lineTo(spot.x - 10, spot.y + 16);
+          spotGfx.closePath();
+          spotGfx.fillPath();
+          spotGfx.fillStyle(0xffdd44, 1);
+          spotGfx.fillCircle(spot.x - 6, spot.y - 4, 4);
+          spotGfx.fillStyle(0xff66aa, 1);
+          spotGfx.fillCircle(spot.x + 6, spot.y - 4, 4);
+          spotGfx.fillStyle(0xffffff, 1);
+          spotGfx.fillCircle(spot.x, spot.y - 8, 4);
+          break;
+        case "fence":
+          spotGfx.fillStyle(0xb58864, 1);
+          spotGfx.fillRect(spot.x - 20, spot.y - 2, 40, 5);
+          spotGfx.fillRect(spot.x - 20, spot.y + 8, 40, 5);
+          spotGfx.fillStyle(0x8a5a3a, 1);
+          spotGfx.fillRect(spot.x - 18, spot.y - 16, 5, 26);
+          spotGfx.fillRect(spot.x - 2, spot.y - 16, 5, 26);
+          spotGfx.fillRect(spot.x + 14, spot.y - 16, 5, 26);
+          break;
+        case "nest-box":
+          spotGfx.fillStyle(0x7a4a2a, 1);
+          spotGfx.fillRect(spot.x - 16, spot.y - 4, 32, 22);
+          spotGfx.fillStyle(0x4a2a1a, 1);
+          spotGfx.beginPath();
+          spotGfx.moveTo(spot.x - 20, spot.y - 4);
+          spotGfx.lineTo(spot.x, spot.y - 22);
+          spotGfx.lineTo(spot.x + 20, spot.y - 4);
+          spotGfx.closePath();
+          spotGfx.fillPath();
+          spotGfx.fillStyle(0x2a1a0a, 1);
+          spotGfx.fillCircle(spot.x, spot.y + 8, 5);
+          break;
+      }
     }
   }
 

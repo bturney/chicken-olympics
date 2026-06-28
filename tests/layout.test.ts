@@ -36,4 +36,30 @@ describe("FarmyardLayout", () => {
   it("defines a positive player movement speed", () => {
     expect(FARMYARD_LAYOUT.playerSpeed).toBeGreaterThan(0);
   });
+
+  it("has exactly four hiding spots", () => {
+    expect(FARMYARD_LAYOUT.hidingSpots).toHaveLength(4);
+  });
+
+  it("has all hiding spots within the playable bounds", () => {
+    const { bounds, hidingSpots } = FARMYARD_LAYOUT;
+
+    for (const spot of hidingSpots) {
+      expect(spot.x).toBeGreaterThanOrEqual(bounds.x);
+      expect(spot.x).toBeLessThanOrEqual(bounds.x + bounds.width);
+      expect(spot.y).toBeGreaterThanOrEqual(bounds.y);
+      expect(spot.y).toBeLessThanOrEqual(bounds.y + bounds.height);
+    }
+  });
+
+  it("has distinct hiding spot positions", () => {
+    const spots = FARMYARD_LAYOUT.hidingSpots;
+    const seen = new Set<string>();
+
+    for (const spot of spots) {
+      const key = `${spot.x},${spot.y}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
 });

@@ -39,3 +39,49 @@ export function getWinner(state: MatchState): 0 | 1 | null {
   if (p2 > p1) return 1;
   return null;
 }
+
+export const DEFAULT_PEEK_DURATION_MS = 5_000;
+
+export interface PeekState {
+  activeSpotIndex: number | null;
+  peekStartedAtMs: number | null;
+}
+
+export function createPeekState(): PeekState {
+  return {
+    activeSpotIndex: null,
+    peekStartedAtMs: null,
+  };
+}
+
+export function selectNextPeekSpot(
+  spotCount: number,
+  randomValue: number,
+): number {
+  return Math.floor(randomValue * spotCount);
+}
+
+export function startPeek(
+  state: PeekState,
+  currentTimeMs: number,
+  spotIndex: number,
+): PeekState {
+  return {
+    activeSpotIndex: spotIndex,
+    peekStartedAtMs: currentTimeMs,
+  };
+}
+
+export function isPeekActive(state: PeekState, currentTimeMs: number): boolean {
+  if (state.activeSpotIndex === null || state.peekStartedAtMs === null) {
+    return false;
+  }
+  return currentTimeMs - state.peekStartedAtMs < DEFAULT_PEEK_DURATION_MS;
+}
+
+export function expirePeek(_state: PeekState): PeekState {
+  return {
+    activeSpotIndex: null,
+    peekStartedAtMs: null,
+  };
+}

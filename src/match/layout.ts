@@ -1,7 +1,13 @@
+export interface Position {
+  x: number;
+  y: number;
+}
+
 export interface FarmyardLayout {
   bounds: { x: number; y: number; width: number; height: number };
-  playerStartPositions: [{ x: number; y: number }, { x: number; y: number }];
+  playerStartPositions: [Position, Position];
   playerSpeed: number;
+  hidingSpots: Position[];
 }
 
 export const FARMYARD_LAYOUT: FarmyardLayout = {
@@ -16,4 +22,10 @@ export const FARMYARD_LAYOUT: FarmyardLayout = {
     { x: 600, y: 300 },
   ],
   playerSpeed: 200,
+  hidingSpots: [
+    { x: 160, y: 180 },
+    { x: 480, y: 180 },
+    { x: 640, y: 380 },
+    { x: 320, y: 420 },
+  ],
 };

@@ -3,6 +3,8 @@ import {
   PLAYER_CHICKEN_COLORS,
   availableColors,
   canStartMatch,
+  getPlayerChickenColorLabel,
+  getPlayerChickenHex,
   type PlayerChickenColor,
   type SetupSelection,
 } from "../src/setup/colors";
@@ -16,6 +18,46 @@ describe("PLAYER_CHICKEN_COLORS", () => {
     const colors: readonly string[] = PLAYER_CHICKEN_COLORS;
     expect(colors).not.toContain("green");
     expect(colors).not.toContain("yellow");
+  });
+});
+
+describe("getPlayerChickenHex", () => {
+  it("returns a distinct Phaser-friendly hex for every available Player Chicken color", () => {
+    const hexes = new Set<number>();
+    for (const color of PLAYER_CHICKEN_COLORS) {
+      const hex = getPlayerChickenHex(color);
+      expect(Number.isInteger(hex)).toBe(true);
+      expect(hex).toBeGreaterThanOrEqual(0);
+      expect(hexes.has(hex)).toBe(false);
+      hexes.add(hex);
+    }
+    expect(hexes.size).toBe(PLAYER_CHICKEN_COLORS.length);
+  });
+
+  it("returns a green-or-yellow-adjacent hex for blue, red, purple, and orange", () => {
+    const reserved = new Set<number>([
+      getPlayerChickenHex("blue"),
+      getPlayerChickenHex("red"),
+      getPlayerChickenHex("purple"),
+      getPlayerChickenHex("orange"),
+    ]);
+    expect(reserved.has(0x44aa44)).toBe(false);
+    expect(reserved.has(0xffdd44)).toBe(false);
+  });
+});
+
+describe("getPlayerChickenColorLabel", () => {
+  it("returns a human-readable capitalized name for every Player Chicken color", () => {
+    const expected: Record<PlayerChickenColor, string> = {
+      blue: "Blue",
+      red: "Red",
+      purple: "Purple",
+      orange: "Orange",
+    };
+
+    for (const color of PLAYER_CHICKEN_COLORS) {
+      expect(getPlayerChickenColorLabel(color)).toBe(expected[color]);
+    }
   });
 });
 

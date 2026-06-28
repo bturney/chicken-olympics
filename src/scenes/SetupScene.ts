@@ -3,16 +3,11 @@ import {
   PLAYER_CHICKEN_COLORS,
   availableColors,
   canStartMatch,
+  getPlayerChickenColorLabel,
+  getPlayerChickenHex,
   type PlayerChickenColor,
   type SetupSelection,
 } from "../setup/colors";
-
-const PLAYER_CHICKEN_HEX: Record<PlayerChickenColor, number> = {
-  blue: 0x4488ff,
-  red: 0xff4444,
-  purple: 0xaa44ff,
-  orange: 0xff8844,
-};
 
 const SWATCH_X_POSITIONS = [160, 320, 480, 640] as const;
 const P1_SWATCH_Y = 180;
@@ -79,8 +74,8 @@ export class SetupScene extends Phaser.Scene {
     for (let i = 0; i < PLAYER_CHICKEN_COLORS.length; i++) {
       const color = PLAYER_CHICKEN_COLORS[i]!;
       const x = SWATCH_X_POSITIONS[i]!;
-      const hex = PLAYER_CHICKEN_HEX[color];
-      const label = color.charAt(0).toUpperCase() + color.slice(1);
+      const hex = getPlayerChickenHex(color);
+      const label = getPlayerChickenColorLabel(color);
 
       const text = this.add
         .text(x, y, label, {

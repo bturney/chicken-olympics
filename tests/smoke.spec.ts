@@ -58,6 +58,84 @@ function getSwatchEnabled(
   );
 }
 
+function getMatchSceneColors(page: import("@playwright/test").Page): Promise<{
+  p1Color: string | undefined;
+  p2Color: string | undefined;
+  p1TextureExists: boolean;
+  p2TextureExists: boolean;
+  p1ScoreText: string;
+  p2ScoreText: string;
+  p1ScoreTextColor: string;
+  p2ScoreTextColor: string;
+} | null> {
+  return page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return null;
+    const match = scene as unknown as {
+      p1Color?: string;
+      p2Color?: string;
+      p1Chicken: { texture: { key: string } };
+      p2Chicken: { texture: { key: string } };
+      p1ScoreText: { text: string; style: { color: string } };
+      p2ScoreText: { text: string; style: { color: string } };
+    };
+    return {
+      p1Color: match.p1Color,
+      p2Color: match.p2Color,
+      p1TextureExists:
+        match.p1Chicken.texture.key === `p1_chicken_${match.p1Color}`,
+      p2TextureExists:
+        match.p2Chicken.texture.key === `p2_chicken_${match.p2Color}`,
+      p1ScoreText: match.p1ScoreText.text,
+      p2ScoreText: match.p2ScoreText.text,
+      p1ScoreTextColor: match.p1ScoreText.style.color,
+      p2ScoreTextColor: match.p2ScoreText.style.color,
+    };
+  });
+}
+
+function getMatchTextureColor(
+  page: import("@playwright/test").Page,
+  textureKey: string,
+): Promise<{ r: number; g: number; b: number } | null> {
+  return page.evaluate((key) => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const textureManager = game.textures;
+    const texture = textureManager.get(key);
+    if (!texture) return null;
+    const source = texture.getSourceImage() as HTMLCanvasElement | null;
+    if (!source) return null;
+    const ctx = source.getContext("2d");
+    if (!ctx) return null;
+    const pixel = ctx.getImageData(28, 28, 1, 1).data;
+    return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0 };
+  }, textureKey);
+}
+
+function cssHexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return null;
+  const value = match[1]!;
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
+const EXPECTED_HEX: Record<
+  PlayerChickenColor,
+  { r: number; g: number; b: number }
+> = {
+  blue: { r: 0x44, g: 0x88, b: 0xff },
+  red: { r: 0xff, g: 0x44, b: 0x44 },
+  purple: { r: 0xaa, g: 0x44, b: 0xff },
+  orange: { r: 0xff, g: 0x88, b: 0x44 },
+};
+
 test("app loads, canvas mounts, and setup scene is active", async ({
   page,
 }) => {
@@ -97,25 +175,206 @@ test("setup lets both players pick distinct Player Chicken colors and passes the
 
   await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
 
-  const sceneData = await page.evaluate(() => {
-    const game = window.__CHICKEN_OLYMPICS__;
-    if (!game) return null;
-    const scene = game.scene.getScene("MatchScene");
-    if (!scene) return null;
-    const match = scene as unknown as {
-      matchState?: { scores: [number, number]; elapsedMs: number };
-      p1Color?: string;
-      p2Color?: string;
-    };
-    return {
-      matchStatePresent: match.matchState != null,
-      p1Color: match.p1Color,
-      p2Color: match.p2Color,
-    };
-  });
+  const sceneData = await getMatchSceneColors(page);
 
   expect(sceneData).not.toBeNull();
-  expect(sceneData?.matchStatePresent).toBe(true);
   expect(sceneData?.p1Color).toBe("blue");
   expect(sceneData?.p2Color).toBe("red");
+  expect(sceneData?.p1TextureExists).toBe(true);
+  expect(sceneData?.p2TextureExists).toBe(true);
+  expect(sceneData?.p1ScoreText).toBe("P1 (Blue): 0");
+  expect(sceneData?.p2ScoreText).toBe("P2 (Red): 0");
+
+  const expectedBlue = cssHexToRgb("#4488ff");
+  const expectedRed = cssHexToRgb("#ff4444");
+  expect(expectedBlue).not.toBeNull();
+  expect(expectedRed).not.toBeNull();
+  const p1Color = cssHexToRgb(sceneData!.p1ScoreTextColor);
+  const p2Color = cssHexToRgb(sceneData!.p2ScoreTextColor);
+  expect(p1Color).toEqual(expectedBlue);
+  expect(p2Color).toEqual(expectedRed);
+});
+
+test("Match scene renders Player Chicken textures and HUD in the selected colors", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 480 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 640 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  const sceneData = await getMatchSceneColors(page);
+
+  expect(sceneData).not.toBeNull();
+  expect(sceneData?.p1Color).toBe("purple");
+  expect(sceneData?.p2Color).toBe("orange");
+  expect(sceneData?.p1TextureExists).toBe(true);
+  expect(sceneData?.p2TextureExists).toBe(true);
+  expect(sceneData?.p1ScoreText).toBe("P1 (Purple): 0");
+  expect(sceneData?.p2ScoreText).toBe("P2 (Orange): 0");
+
+  const expectedPurple = cssHexToRgb("#aa44ff");
+  const expectedOrange = cssHexToRgb("#ff8844");
+  expect(expectedPurple).not.toBeNull();
+  expect(expectedOrange).not.toBeNull();
+  const p1Color = cssHexToRgb(sceneData!.p1ScoreTextColor);
+  const p2Color = cssHexToRgb(sceneData!.p2ScoreTextColor);
+  expect(p1Color).toEqual(expectedPurple);
+  expect(p2Color).toEqual(expectedOrange);
+
+  const p1TextureColor = await getMatchTextureColor(page, "p1_chicken_purple");
+  const p2TextureColor = await getMatchTextureColor(page, "p2_chicken_orange");
+  expect(p1TextureColor).toEqual(EXPECTED_HEX.purple);
+  expect(p2TextureColor).toEqual(EXPECTED_HEX.orange);
+});
+
+async function completeMatchForTest(
+  page: import("@playwright/test").Page,
+  scores: [number, number],
+): Promise<void> {
+  await page.evaluate((nextScores) => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return;
+    const match = scene as unknown as {
+      matchState: {
+        durationMs: number;
+        elapsedMs: number;
+        scores: [number, number];
+      };
+    };
+    match.matchState = {
+      ...match.matchState,
+      elapsedMs: match.matchState.durationMs,
+      scores: nextScores,
+    };
+  }, scores);
+}
+
+interface PodiumProbe {
+  p1ScoreText: string;
+  p2ScoreText: string;
+  p1ScoreTextColor: string;
+  p2ScoreTextColor: string;
+  resultText: string;
+  chickenTextureKeys: string[];
+}
+
+function probePodium(
+  page: import("@playwright/test").Page,
+): Promise<PodiumProbe | null> {
+  return page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const scene = game.scene.getScene("PodiumScene");
+    if (!scene) return null;
+    const podium = scene as unknown as {
+      children: {
+        list: Array<{
+          type: string;
+          text?: string;
+          style?: { color?: string };
+          texture?: { key: string };
+        }>;
+      };
+    };
+    const allChildren = podium.children.list;
+    const texts = allChildren.filter((c) => c.type === "Text");
+    const images = allChildren.filter((c) => c.type === "Image");
+    const scoreP1 = texts.find((t) => t.text?.startsWith("Player 1 ("));
+    const scoreP2 = texts.find((t) => t.text?.startsWith("Player 2 ("));
+    const resultText = texts.find(
+      (t) =>
+        t.text === "Player 1 Wins!" ||
+        t.text === "Player 2 Wins!" ||
+        t.text === "It's a Tie!",
+    );
+    return {
+      p1ScoreText: scoreP1?.text ?? "",
+      p2ScoreText: scoreP2?.text ?? "",
+      p1ScoreTextColor: scoreP1?.style?.color ?? "",
+      p2ScoreTextColor: scoreP2?.style?.color ?? "",
+      resultText: resultText?.text ?? "",
+      chickenTextureKeys: images
+        .map((i) => i.texture?.key)
+        .filter((k): k is string => typeof k === "string"),
+    };
+  });
+}
+
+test("Podium Ceremony renders winner with gold and second place with silver in the selected colors", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await completeMatchForTest(page, [3, 1]);
+
+  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
+
+  const podium = await probePodium(page);
+
+  expect(podium).not.toBeNull();
+  expect(podium?.p1ScoreText).toBe("Player 1 (Blue): 3");
+  expect(podium?.p2ScoreText).toBe("Player 2 (Red): 1");
+  expect(cssHexToRgb(podium!.p1ScoreTextColor)).toEqual(cssHexToRgb("#4488ff"));
+  expect(cssHexToRgb(podium!.p2ScoreTextColor)).toEqual(cssHexToRgb("#ff4444"));
+  expect(podium?.resultText).toBe("Player 1 Wins!");
+  expect(podium?.chickenTextureKeys).toContain("podium_p1_blue");
+  expect(podium?.chickenTextureKeys).toContain("podium_p2_red");
+});
+
+test("Podium Ceremony renders shared-gold for tied scores in the selected colors", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 480 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 640 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await completeMatchForTest(page, [2, 2]);
+
+  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
+
+  const podium = await probePodium(page);
+
+  expect(podium).not.toBeNull();
+  expect(podium?.p1ScoreText).toBe("Player 1 (Purple): 2");
+  expect(podium?.p2ScoreText).toBe("Player 2 (Orange): 2");
+  expect(podium?.resultText).toBe("It's a Tie!");
+  expect(podium?.chickenTextureKeys).toContain("podium_p1_purple");
+  expect(podium?.chickenTextureKeys).toContain("podium_p2_orange");
 });

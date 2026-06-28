@@ -378,3 +378,203 @@ test("Podium Ceremony renders shared-gold for tied scores in the selected colors
   expect(podium?.chickenTextureKeys).toContain("podium_p1_purple");
   expect(podium?.chickenTextureKeys).toContain("podium_p2_orange");
 });
+
+async function movePlayerOntoActiveChick(
+  page: import("@playwright/test").Page,
+  playerIndex: 0 | 1,
+): Promise<void> {
+  await page.evaluate(
+    ({ playerIndex }) => {
+      const game = window.__CHICKEN_OLYMPICS__;
+      if (!game) return;
+      const scene = game.scene.getScene("MatchScene");
+      if (!scene) return;
+      const match = scene as unknown as {
+        p1Chicken: {
+          x: number;
+          y: number;
+          setPosition: (x: number, y: number) => void;
+        };
+        p2Chicken: {
+          x: number;
+          y: number;
+          setPosition: (x: number, y: number) => void;
+        };
+        chickBodies: Array<{ x: number; y: number; visible: boolean }>;
+        peekState: { peeks: Array<{ activeSpotIndex: number | null }> };
+      };
+      const targetChick = match.chickBodies.find(
+        (c, i) =>
+          c.visible && match.peekState.peeks[i]?.activeSpotIndex !== null,
+      );
+      if (!targetChick) return;
+      const player = playerIndex === 0 ? match.p1Chicken : match.p2Chicken;
+      player.setPosition(targetChick.x, targetChick.y);
+    },
+    { playerIndex },
+  );
+}
+
+interface ClaimFeedbackProbe {
+  chickBodies: Array<{
+    tintTopLeft: number;
+    scaleX: number;
+    scaleY: number;
+    visible: boolean;
+  }>;
+  scores: [number, number];
+  p1ScoreText: string;
+  p2ScoreText: string;
+  activeClaimAnimationCount: number;
+  elapsedMs: number;
+  animationDetails: Array<{
+    slotIndex: number;
+    playerIndex: number;
+    startedAtMs: number;
+  }>;
+}
+
+function probeClaimFeedback(
+  page: import("@playwright/test").Page,
+): Promise<ClaimFeedbackProbe | null> {
+  return page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return null;
+    const match = scene as unknown as {
+      chickBodies: Array<{
+        tintTopLeft: number;
+        scaleX: number;
+        scaleY: number;
+        visible: boolean;
+      }>;
+      matchState: { scores: [number, number]; elapsedMs: number };
+      p1ScoreText: { text: string };
+      p2ScoreText: { text: string };
+      claimAnimationState: {
+        animations: Array<{
+          slotIndex: number;
+          playerIndex: number;
+          startedAtMs: number;
+        }>;
+      };
+    };
+    return {
+      chickBodies: match.chickBodies.map((b) => ({
+        tintTopLeft: b.tintTopLeft,
+        scaleX: b.scaleX,
+        scaleY: b.scaleY,
+        visible: b.visible,
+      })),
+      scores: match.matchState.scores,
+      p1ScoreText: match.p1ScoreText.text,
+      p2ScoreText: match.p2ScoreText.text,
+      activeClaimAnimationCount: match.claimAnimationState.animations.length,
+      elapsedMs: match.matchState.elapsedMs,
+      animationDetails: match.claimAnimationState.animations.map((a) => ({
+        slotIndex: a.slotIndex,
+        playerIndex: a.playerIndex,
+        startedAtMs: a.startedAtMs,
+      })),
+    };
+  });
+}
+
+test("claiming a normal Chick tints it the claiming player's color, pops it, and updates the score immediately", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await expect
+    .poll(async () => (await probeClaimFeedback(page))?.chickBodies.length, {
+      timeout: 2_000,
+    })
+    .toBe(3);
+
+  const before = await probeClaimFeedback(page);
+  expect(before).not.toBeNull();
+  const initialScores = before?.scores ?? [0, 0];
+
+  await movePlayerOntoActiveChick(page, 0);
+
+  await expect
+    .poll(() => probeClaimFeedback(page), {
+      timeout: 2_000,
+      intervals: [16, 32, 64],
+    })
+    .toMatchObject({
+      scores: [initialScores[0] + 1, initialScores[1]],
+      p1ScoreText: `P1 (Blue): ${initialScores[0] + 1}`,
+      p2ScoreText: `P2 (Red): ${initialScores[1]}`,
+      activeClaimAnimationCount: 1,
+    });
+
+  const after = await probeClaimFeedback(page);
+  expect(after).not.toBeNull();
+  const claimed = after!.chickBodies.find((b) => b.tintTopLeft === 0x4488ff);
+  expect(claimed).toBeDefined();
+  expect(claimed?.visible).toBe(true);
+  expect(claimed?.scaleX).toBeGreaterThan(0);
+  expect(claimed?.scaleX).toBeLessThanOrEqual(1.5);
+  expect(claimed?.scaleY).toBeCloseTo(claimed?.scaleX ?? 1, 3);
+  expect(claimed?.scaleX).not.toBe(1);
+});
+
+test("claim animation is removed and the claiming color tint clears once feedback ends", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 480 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 640 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await expect
+    .poll(async () => (await probeClaimFeedback(page))?.chickBodies.length, {
+      timeout: 2_000,
+    })
+    .toBe(3);
+
+  await movePlayerOntoActiveChick(page, 1);
+
+  await expect
+    .poll(() => probeClaimFeedback(page), { timeout: 2_000 })
+    .toMatchObject({
+      scores: [0, 1],
+      activeClaimAnimationCount: 1,
+    });
+
+  await expect
+    .poll(() => probeClaimFeedback(page), { timeout: 2_000 })
+    .toMatchObject({ activeClaimAnimationCount: 0 });
+
+  const after = await probeClaimFeedback(page);
+  expect(after).not.toBeNull();
+  const orangeTinted = after!.chickBodies.find(
+    (b) => b.tintTopLeft === 0xff8844,
+  );
+  expect(orangeTinted).toBeUndefined();
+});

@@ -189,6 +189,83 @@ export interface ClaimResult {
   claimed: boolean;
 }
 
+export const CLAIM_FEEDBACK_DURATION_MS = 350;
+export const CLAIM_POP_PEAK_SCALE = 1.4;
+
+export interface ClaimAnimation {
+  slotIndex: number;
+  spotIndex: number;
+  playerIndex: 0 | 1;
+  startedAtMs: number;
+  durationMs: number;
+}
+
+export interface ClaimAnimationState {
+  animations: ClaimAnimation[];
+}
+
+export function createClaimAnimationState(): ClaimAnimationState {
+  return { animations: [] };
+}
+
+export function startClaimAnimation(
+  state: ClaimAnimationState,
+  slotIndex: number,
+  spotIndex: number,
+  playerIndex: 0 | 1,
+  now: number,
+  durationMs: number = CLAIM_FEEDBACK_DURATION_MS,
+): ClaimAnimationState {
+  return {
+    animations: [
+      ...state.animations,
+      { slotIndex, spotIndex, playerIndex, startedAtMs: now, durationMs },
+    ],
+  };
+}
+
+export function getActiveClaimAnimation(
+  state: ClaimAnimationState,
+  slotIndex: number,
+  now: number,
+): ClaimAnimation | null {
+  let latest: ClaimAnimation | null = null;
+  for (const anim of state.animations) {
+    if (anim.slotIndex !== slotIndex) continue;
+    if (now - anim.startedAtMs >= anim.durationMs) continue;
+    if (latest === null || anim.startedAtMs > latest.startedAtMs) {
+      latest = anim;
+    }
+  }
+  return latest;
+}
+
+export function tickClaimAnimations(
+  state: ClaimAnimationState,
+  now: number,
+): ClaimAnimationState {
+  return {
+    animations: state.animations.filter(
+      (anim) => now - anim.startedAtMs < anim.durationMs,
+    ),
+  };
+}
+
+export function computeClaimPopScale(
+  startedAtMs: number,
+  now: number,
+  durationMs: number = CLAIM_FEEDBACK_DURATION_MS,
+): number {
+  if (now <= startedAtMs) return 1;
+  const elapsed = now - startedAtMs;
+  if (elapsed >= durationMs) return 0;
+  const progress = elapsed / durationMs;
+  if (progress < 0.5) {
+    return 1 + (progress / 0.5) * (CLAIM_POP_PEAK_SCALE - 1);
+  }
+  return CLAIM_POP_PEAK_SCALE * (1 - (progress - 0.5) / 0.5);
+}
+
 export function attemptClaim(
   matchState: MatchState,
   peekState: PeekState,

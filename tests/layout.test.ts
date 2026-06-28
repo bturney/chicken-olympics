@@ -1,5 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { FARMYARD_LAYOUT } from "../src/match/layout";
+import {
+  FARMYARD_LAYOUT,
+  HIDING_SPOT_TYPES,
+  type HidingSpot,
+  type HidingSpotType,
+} from "../src/match/layout";
+
+describe("HidingSpot types", () => {
+  it("exposes the canonical Hiding Spot types referenced by the layout", () => {
+    const expected: HidingSpotType[] = [
+      "bush",
+      "hay-bale",
+      "barrel",
+      "flower-pot",
+      "fence",
+      "nest-box",
+    ];
+    expect([...HIDING_SPOT_TYPES]).toEqual(expected);
+  });
+});
 
 describe("FarmyardLayout", () => {
   it("defines playable bounds within the game dimensions", () => {
@@ -37,8 +56,41 @@ describe("FarmyardLayout", () => {
     expect(FARMYARD_LAYOUT.playerSpeed).toBeGreaterThan(0);
   });
 
-  it("has exactly four hiding spots", () => {
-    expect(FARMYARD_LAYOUT.hidingSpots).toHaveLength(4);
+  it("has at least four hiding spots to support three normal Chicks plus the Green Chick extra peek", () => {
+    expect(FARMYARD_LAYOUT.hidingSpots.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("describes every hiding spot with a valid type from the canonical set", () => {
+    const validTypes = new Set<string>(HIDING_SPOT_TYPES);
+
+    for (const spot of FARMYARD_LAYOUT.hidingSpots) {
+      expect(validTypes.has(spot.type)).toBe(true);
+    }
+  });
+
+  it("names every hiding spot with a non-empty human-readable name", () => {
+    for (const spot of FARMYARD_LAYOUT.hidingSpots) {
+      expect(spot.name).toBeTypeOf("string");
+      expect(spot.name.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("uses more than one type of hiding spot for visual variety", () => {
+    const usedTypes = new Set<HidingSpotType>(
+      FARMYARD_LAYOUT.hidingSpots.map((spot) => spot.type),
+    );
+    expect(usedTypes.size).toBeGreaterThan(1);
+  });
+
+  it("exposes hiding spots as HidingSpot objects that satisfy the public type shape", () => {
+    const spots: HidingSpot[] = FARMYARD_LAYOUT.hidingSpots;
+    expect(spots.length).toBeGreaterThan(0);
+    for (const spot of spots) {
+      expect(spot).toHaveProperty("x");
+      expect(spot).toHaveProperty("y");
+      expect(spot).toHaveProperty("type");
+      expect(spot).toHaveProperty("name");
+    }
   });
 
   it("has all hiding spots within the playable bounds", () => {

@@ -28,10 +28,10 @@ describe("FarmyardLayout", () => {
     expect(FARMYARD_LAYOUT.bounds.height).toBeGreaterThan(0);
     expect(
       FARMYARD_LAYOUT.bounds.x + FARMYARD_LAYOUT.bounds.width,
-    ).toBeLessThanOrEqual(800);
+    ).toBeLessThanOrEqual(1600);
     expect(
       FARMYARD_LAYOUT.bounds.y + FARMYARD_LAYOUT.bounds.height,
-    ).toBeLessThanOrEqual(600);
+    ).toBeLessThanOrEqual(1200);
   });
 
   it("has two player start positions inside the bounds", () => {

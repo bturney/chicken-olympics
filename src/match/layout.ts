@@ -27,24 +27,32 @@ export interface FarmyardLayout {
   hidingSpots: HidingSpot[];
 }
 
+/**
+ * Single resolution knob. The game was originally authored against an 800x600
+ * canvas; every absolute-pixel quantity (here and in the scenes) is expressed
+ * as `base * WORLD_SCALE` so the whole game scales uniformly from one number.
+ * Bumping the canvas resolution in main.ts means changing this and nothing else.
+ */
+export const WORLD_SCALE = 2;
+
 export const FARMYARD_LAYOUT: FarmyardLayout = {
   bounds: {
-    x: 40,
-    y: 90,
-    width: 720,
-    height: 470,
+    x: 40 * WORLD_SCALE,
+    y: 90 * WORLD_SCALE,
+    width: 720 * WORLD_SCALE,
+    height: 470 * WORLD_SCALE,
   },
   playerStartPositions: [
-    { x: 200, y: 300 },
-    { x: 600, y: 300 },
+    { x: 200 * WORLD_SCALE, y: 300 * WORLD_SCALE },
+    { x: 600 * WORLD_SCALE, y: 300 * WORLD_SCALE },
   ],
-  playerSpeed: 200,
+  playerSpeed: 200 * WORLD_SCALE,
   hidingSpots: [
-    { x: 140, y: 180, type: "bush", name: "Northwest Bush" },
-    { x: 400, y: 150, type: "hay-bale", name: "North Hay Bale" },
-    { x: 680, y: 200, type: "barrel", name: "Northeast Barrel" },
-    { x: 200, y: 470, type: "flower-pot", name: "Southwest Flower Pot" },
-    { x: 560, y: 490, type: "fence", name: "South Fence" },
-    { x: 400, y: 400, type: "nest-box", name: "Center Nest Box" },
+    { x: 140 * WORLD_SCALE, y: 180 * WORLD_SCALE, type: "bush", name: "Northwest Bush" },
+    { x: 400 * WORLD_SCALE, y: 150 * WORLD_SCALE, type: "hay-bale", name: "North Hay Bale" },
+    { x: 680 * WORLD_SCALE, y: 200 * WORLD_SCALE, type: "barrel", name: "Northeast Barrel" },
+    { x: 200 * WORLD_SCALE, y: 470 * WORLD_SCALE, type: "flower-pot", name: "Southwest Flower Pot" },
+    { x: 560 * WORLD_SCALE, y: 490 * WORLD_SCALE, type: "fence", name: "South Fence" },
+    { x: 400 * WORLD_SCALE, y: 400 * WORLD_SCALE, type: "nest-box", name: "Center Nest Box" },
   ],
 };

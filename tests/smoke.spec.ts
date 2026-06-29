@@ -21,6 +21,11 @@ function getCanvasScale(
     const canvas = document.querySelector("canvas");
     if (!canvas) throw new Error("No canvas");
     const rect = canvas.getBoundingClientRect();
+    // The click coordinates below are expressed in the original 800x600
+    // authoring space. The game now renders at 2x that (1600x1200), but a point
+    // at the same screen *fraction* maps identically whether we divide the old
+    // coordinate by the old dimensions or the (doubled) coordinate by the new
+    // ones. Keeping the 800x600 divisor lets those call sites stay unchanged.
     return {
       scaleX: rect.width / 800,
       scaleY: rect.height / 600,
@@ -110,7 +115,11 @@ function getMatchTextureColor(
     if (!source) return null;
     const ctx = source.getContext("2d");
     if (!ctx) return null;
-    const pixel = ctx.getImageData(28, 28, 1, 1).data;
+    // Sample the texture's center, which is the middle of the player circle
+    // regardless of the resolution scale factor.
+    const cx = Math.floor(source.width / 2);
+    const cy = Math.floor(source.height / 2);
+    const pixel = ctx.getImageData(cx, cy, 1, 1).data;
     return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0 };
   }, textureKey);
 }

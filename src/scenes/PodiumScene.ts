@@ -10,6 +10,7 @@ import {
   type SfxScheduler,
 } from "../audio/sfx";
 import { createWebAudioScheduler } from "../audio/web-audio";
+import { WORLD_SCALE } from "../match/layout";
 
 interface PodiumData {
   scores?: [number, number];
@@ -18,7 +19,7 @@ interface PodiumData {
   p2Color?: PlayerChickenColor;
 }
 
-const PLAYER_RADIUS = 28;
+const PLAYER_RADIUS = 28 * WORLD_SCALE;
 
 const PODIUM_GOLD = 0xffd700;
 const PODIUM_SILVER = 0xc0c0c0;
@@ -27,9 +28,24 @@ const PODIUM_GROUND = 0x4a3a2a;
 const PODIUM_BLOCK_TOP = 0x6a5a3a;
 const PODIUM_BLOCK_FRONT = 0x3a2a1a;
 
-const GOLD_BLOCK = { x: 360, y: 300, width: 160, height: 140 };
-const SILVER_BLOCK = { x: 200, y: 360, width: 140, height: 80 };
-const BRONZE_BLOCK = { x: 540, y: 380, width: 140, height: 60 };
+const GOLD_BLOCK = {
+  x: 360 * WORLD_SCALE,
+  y: 300 * WORLD_SCALE,
+  width: 160 * WORLD_SCALE,
+  height: 140 * WORLD_SCALE,
+};
+const SILVER_BLOCK = {
+  x: 200 * WORLD_SCALE,
+  y: 360 * WORLD_SCALE,
+  width: 140 * WORLD_SCALE,
+  height: 80 * WORLD_SCALE,
+};
+const BRONZE_BLOCK = {
+  x: 540 * WORLD_SCALE,
+  y: 380 * WORLD_SCALE,
+  width: 140 * WORLD_SCALE,
+  height: 60 * WORLD_SCALE,
+};
 
 function podiumTextureKey(player: 1 | 2, color: PlayerChickenColor): string {
   return `podium_p${player}_${color}`;
@@ -138,24 +154,32 @@ export class PodiumScene extends Phaser.Scene {
     blockHeight: number,
   ): void {
     const gfx = this.make.graphics({ x: 0, y: 0 }, false);
+    const radius = 6 * WORLD_SCALE;
+    const topStrip = 8 * WORLD_SCALE;
     gfx.fillStyle(podiumBlockHex(label), 1);
-    gfx.fillRoundedRect(0, 0, blockWidth, blockHeight, 6);
+    gfx.fillRoundedRect(0, 0, blockWidth, blockHeight, radius);
     gfx.fillStyle(PODIUM_BLOCK_TOP, 1);
-    gfx.fillRoundedRect(0, 0, blockWidth, 8, { tl: 6, tr: 6, bl: 0, br: 0 });
-    gfx.lineStyle(2, PODIUM_BLOCK_FRONT, 1);
-    gfx.strokeRoundedRect(0, 0, blockWidth, blockHeight, 6);
+    gfx.fillRoundedRect(0, 0, blockWidth, topStrip, {
+      tl: radius,
+      tr: radius,
+      bl: 0,
+      br: 0,
+    });
+    gfx.lineStyle(2 * WORLD_SCALE, PODIUM_BLOCK_FRONT, 1);
+    gfx.strokeRoundedRect(0, 0, blockWidth, blockHeight, radius);
     gfx.generateTexture(podiumBlockTextureKey(label), blockWidth, blockHeight);
     gfx.destroy();
   }
 
   private drawGround(width: number, height: number): void {
     const ground = this.add.graphics();
+    const groundY = 440 * WORLD_SCALE;
     ground.fillStyle(PODIUM_GROUND, 1);
-    ground.fillRect(0, 440, width, height - 440);
-    ground.lineStyle(2, 0x2a1a0a, 1);
+    ground.fillRect(0, groundY, width, height - groundY);
+    ground.lineStyle(2 * WORLD_SCALE, 0x2a1a0a, 1);
     ground.beginPath();
-    ground.moveTo(0, 440);
-    ground.lineTo(width, 440);
+    ground.moveTo(0, groundY);
+    ground.lineTo(width, groundY);
     ground.strokePath();
   }
 
@@ -171,14 +195,14 @@ export class PodiumScene extends Phaser.Scene {
       const goldTopY = GOLD_BLOCK.y;
       this.add
         .image(
-          GOLD_BLOCK.x - 24,
+          GOLD_BLOCK.x - 24 * WORLD_SCALE,
           goldTopY - PLAYER_RADIUS,
           podiumTextureKey(1, p1Color),
         )
         .setOrigin(0.5, 1);
       this.add
         .image(
-          GOLD_BLOCK.x + 24,
+          GOLD_BLOCK.x + 24 * WORLD_SCALE,
           goldTopY - PLAYER_RADIUS,
           podiumTextureKey(2, p2Color),
         )
@@ -224,7 +248,7 @@ export class PodiumScene extends Phaser.Scene {
     const gfx = this.make.graphics({ x: 0, y: 0 }, false);
     gfx.fillStyle(getPlayerChickenHex(color), 1);
     gfx.fillCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
-    gfx.lineStyle(2, 0x222222, 1);
+    gfx.lineStyle(2 * WORLD_SCALE, 0x222222, 1);
     gfx.strokeCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
     gfx.generateTexture(
       podiumTextureKey(player, color),
@@ -236,8 +260,8 @@ export class PodiumScene extends Phaser.Scene {
 
   private drawTitle(width: number): void {
     this.add
-      .text(width / 2, 60, "Podium Ceremony", {
-        fontSize: "32px",
+      .text(width / 2, 60 * WORLD_SCALE, "Podium Ceremony", {
+        fontSize: `${32 * WORLD_SCALE}px`,
         color: "#ffd700",
       })
       .setOrigin(0.5);
@@ -254,10 +278,10 @@ export class PodiumScene extends Phaser.Scene {
     this.add
       .text(
         width / 2,
-        height - 135,
+        height - 135 * WORLD_SCALE,
         `Player 1 (${getPlayerChickenColorLabel(p1Color)}): ${p1Score}`,
         {
-          fontSize: "20px",
+          fontSize: `${20 * WORLD_SCALE}px`,
           color: hexToCssHex(getPlayerChickenHex(p1Color)),
         },
       )
@@ -266,10 +290,10 @@ export class PodiumScene extends Phaser.Scene {
     this.add
       .text(
         width / 2,
-        height - 100,
+        height - 100 * WORLD_SCALE,
         `Player 2 (${getPlayerChickenColorLabel(p2Color)}): ${p2Score}`,
         {
-          fontSize: "20px",
+          fontSize: `${20 * WORLD_SCALE}px`,
           color: hexToCssHex(getPlayerChickenHex(p2Color)),
         },
       )
@@ -291,8 +315,8 @@ export class PodiumScene extends Phaser.Scene {
     }
 
     this.add
-      .text(width / 2, height - 60, result, {
-        fontSize: "26px",
+      .text(width / 2, height - 60 * WORLD_SCALE, result, {
+        fontSize: `${26 * WORLD_SCALE}px`,
         color: "#ffffff",
       })
       .setOrigin(0.5);
@@ -300,11 +324,11 @@ export class PodiumScene extends Phaser.Scene {
 
   private drawPlayAgainButton(width: number, height: number): void {
     const button = this.add
-      .text(width / 2, height - 20, "[ Play Again ]", {
-        fontSize: "20px",
+      .text(width / 2, height - 20 * WORLD_SCALE, "[ Play Again ]", {
+        fontSize: `${20 * WORLD_SCALE}px`,
         color: "#44ff44",
         backgroundColor: "#333355",
-        padding: { x: 16, y: 6 },
+        padding: { x: 16 * WORLD_SCALE, y: 6 * WORLD_SCALE },
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });

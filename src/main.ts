@@ -5,10 +5,14 @@ import { PodiumScene } from "./scenes/PodiumScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 600,
+  width: 1600,
+  height: 1200,
   parent: "game-container",
   backgroundColor: "#16213e",
+  render: {
+    antialias: true,
+    roundPixels: true,
+  },
   physics: {
     default: "arcade",
     arcade: {
@@ -19,6 +23,11 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    // Never display the canvas larger than its 1600x1200 backing store. FIT
+    // otherwise stretches it to fill the window, stacking a fractional upscale
+    // on top of the device pixel ratio, which reads as blur. Capping the
+    // displayed size keeps on-screen scaling to a clean multiple of native.
+    max: { width: 1600, height: 1200 },
   },
 };
 

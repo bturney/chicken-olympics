@@ -25,7 +25,7 @@ import {
   type GreenChickState,
   NORMAL_PEEK_COUNT,
 } from "../match/rules";
-import { FARMYARD_LAYOUT } from "../match/layout";
+import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
 import { computeMoveVelocity } from "../match/movement";
 import {
   getPlayerChickenColorLabel,
@@ -50,8 +50,8 @@ const MATCH_SFX_MOMENTS: Record<MatchSfxId, SfxMoment> = {
   greenChickClaim: SFX_GREEN_CHICK_CLAIM,
 };
 
-const PLAYER_SIZE = 28;
-const CHICK_SIZE = 16;
+const PLAYER_SIZE = 28 * WORLD_SCALE;
+const CHICK_SIZE = 16 * WORLD_SCALE;
 const CHICK_COLOR = 0xffdd44;
 const GREEN_CHICK_COLOR = 0x44cc44;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
@@ -215,27 +215,27 @@ export class MatchScene extends Phaser.Scene {
 
   private createHUD(width: number): void {
     this.add
-      .text(width / 2, 30, "Farmyard Stadium", {
-        fontSize: "28px",
+      .text(width / 2, 30 * WORLD_SCALE, "Farmyard Stadium", {
+        fontSize: `${28 * WORLD_SCALE}px`,
         color: "#ffffff",
       })
       .setOrigin(0.5);
 
     this.timerText = this.add
-      .text(width / 2, 60, "", {
-        fontSize: "22px",
+      .text(width / 2, 60 * WORLD_SCALE, "", {
+        fontSize: `${22 * WORLD_SCALE}px`,
         color: "#ffdd44",
       })
       .setOrigin(0.5);
 
-    this.p1ScoreText = this.add.text(20, 10, "", {
-      fontSize: "18px",
+    this.p1ScoreText = this.add.text(20 * WORLD_SCALE, 10 * WORLD_SCALE, "", {
+      fontSize: `${18 * WORLD_SCALE}px`,
       color: hexToCssHex(getPlayerChickenHex(this.p1Color)),
     });
 
     this.p2ScoreText = this.add
-      .text(width - 20, 10, "", {
-        fontSize: "18px",
+      .text(width - 20 * WORLD_SCALE, 10 * WORLD_SCALE, "", {
+        fontSize: `${18 * WORLD_SCALE}px`,
         color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
       })
       .setOrigin(1, 0);
@@ -274,8 +274,8 @@ export class MatchScene extends Phaser.Scene {
     );
     this.p1Chicken.setCollideWorldBounds(true);
     this.p1Label = this.add
-      .text(p1Start.x, p1Start.y + PLAYER_SIZE + 4, "P1", {
-        fontSize: "14px",
+      .text(p1Start.x, p1Start.y + PLAYER_SIZE + 4 * WORLD_SCALE, "P1", {
+        fontSize: `${14 * WORLD_SCALE}px`,
         color: hexToCssHex(getPlayerChickenHex(this.p1Color)),
       })
       .setOrigin(0.5);
@@ -287,8 +287,8 @@ export class MatchScene extends Phaser.Scene {
     );
     this.p2Chicken.setCollideWorldBounds(true);
     this.p2Label = this.add
-      .text(p2Start.x, p2Start.y + PLAYER_SIZE + 4, "P2", {
-        fontSize: "14px",
+      .text(p2Start.x, p2Start.y + PLAYER_SIZE + 4 * WORLD_SCALE, "P2", {
+        fontSize: `${14 * WORLD_SCALE}px`,
         color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
       })
       .setOrigin(0.5);
@@ -393,78 +393,91 @@ export class MatchScene extends Phaser.Scene {
   private createHidingSpots(): void {
     const spotGfx = this.add.graphics();
 
+    // Decoration shapes are drawn in unscaled local space around (0,0) and
+    // sized to the original CHICK_SIZE, then a per-spot canvas transform
+    // (translate to the already-scaled anchor, then scale by WORLD_SCALE)
+    // enlarges geometry and line widths uniformly without touching colors.
+    // This keeps the hand-tuned peek offsets (commit fe64f28) intact.
+    const localChickSize = CHICK_SIZE / WORLD_SCALE;
+
     for (const spot of FARMYARD_LAYOUT.hidingSpots) {
+      spotGfx.save();
+      spotGfx.translateCanvas(spot.x, spot.y);
+      spotGfx.scaleCanvas(WORLD_SCALE, WORLD_SCALE);
+
       switch (spot.type) {
         case "bush":
           // Canopy sits a touch above and tighter than the chick so the
           // chick peeks out the bottom instead of being fully swallowed.
           spotGfx.fillStyle(0x3a8a3a, 1);
-          spotGfx.fillCircle(spot.x, spot.y - 6, CHICK_SIZE - 1);
+          spotGfx.fillCircle(0, -6, localChickSize - 1);
           spotGfx.fillStyle(0x66cc66, 1);
-          spotGfx.fillCircle(spot.x - 4, spot.y - 10, 6);
-          spotGfx.fillCircle(spot.x + 6, spot.y - 4, 5);
+          spotGfx.fillCircle(-4, -10, 6);
+          spotGfx.fillCircle(6, -4, 5);
           break;
         case "hay-bale":
           spotGfx.fillStyle(0xd9b066, 1);
-          spotGfx.fillRoundedRect(spot.x - 22, spot.y - 12, 44, 24, 4);
+          spotGfx.fillRoundedRect(-22, -12, 44, 24, 4);
           spotGfx.lineStyle(2, 0xa37a3a, 1);
           spotGfx.beginPath();
-          spotGfx.moveTo(spot.x - 18, spot.y - 6);
-          spotGfx.lineTo(spot.x + 18, spot.y - 6);
-          spotGfx.moveTo(spot.x - 18, spot.y + 6);
-          spotGfx.lineTo(spot.x + 18, spot.y + 6);
+          spotGfx.moveTo(-18, -6);
+          spotGfx.lineTo(18, -6);
+          spotGfx.moveTo(-18, 6);
+          spotGfx.lineTo(18, 6);
           spotGfx.strokePath();
           break;
         case "barrel":
           // Barrel sits a little higher and shorter than the chick so the
           // chick peeks out the bottom instead of being fully covered.
           spotGfx.fillStyle(0x8a4a2a, 1);
-          spotGfx.fillRoundedRect(spot.x - 14, spot.y - 18, 28, 28, 4);
+          spotGfx.fillRoundedRect(-14, -18, 28, 28, 4);
           spotGfx.fillStyle(0x5a3015, 1);
-          spotGfx.fillRect(spot.x - 14, spot.y - 10, 28, 4);
-          spotGfx.fillRect(spot.x - 14, spot.y, 28, 4);
+          spotGfx.fillRect(-14, -10, 28, 4);
+          spotGfx.fillRect(-14, 0, 28, 4);
           break;
         case "flower-pot":
           spotGfx.fillStyle(0xc04a2a, 1);
           spotGfx.beginPath();
-          spotGfx.moveTo(spot.x - 14, spot.y);
-          spotGfx.lineTo(spot.x + 14, spot.y);
-          spotGfx.lineTo(spot.x + 10, spot.y + 16);
-          spotGfx.lineTo(spot.x - 10, spot.y + 16);
+          spotGfx.moveTo(-14, 0);
+          spotGfx.lineTo(14, 0);
+          spotGfx.lineTo(10, 16);
+          spotGfx.lineTo(-10, 16);
           spotGfx.closePath();
           spotGfx.fillPath();
           spotGfx.fillStyle(0xffdd44, 1);
-          spotGfx.fillCircle(spot.x - 6, spot.y - 4, 4);
+          spotGfx.fillCircle(-6, -4, 4);
           spotGfx.fillStyle(0xff66aa, 1);
-          spotGfx.fillCircle(spot.x + 6, spot.y - 4, 4);
+          spotGfx.fillCircle(6, -4, 4);
           spotGfx.fillStyle(0xffffff, 1);
-          spotGfx.fillCircle(spot.x, spot.y - 8, 4);
+          spotGfx.fillCircle(0, -8, 4);
           break;
         case "fence":
           spotGfx.fillStyle(0xb58864, 1);
-          spotGfx.fillRect(spot.x - 20, spot.y - 2, 40, 5);
-          spotGfx.fillRect(spot.x - 20, spot.y + 8, 40, 5);
+          spotGfx.fillRect(-20, -2, 40, 5);
+          spotGfx.fillRect(-20, 8, 40, 5);
           spotGfx.fillStyle(0x8a5a3a, 1);
-          spotGfx.fillRect(spot.x - 18, spot.y - 16, 5, 26);
-          spotGfx.fillRect(spot.x - 2, spot.y - 16, 5, 26);
-          spotGfx.fillRect(spot.x + 14, spot.y - 16, 5, 26);
+          spotGfx.fillRect(-18, -16, 5, 26);
+          spotGfx.fillRect(-2, -16, 5, 26);
+          spotGfx.fillRect(14, -16, 5, 26);
           break;
         case "nest-box":
           // Box sits lower and narrower than the chick so the chick's head
           // peeks above the roofline rather than being buried under it.
           spotGfx.fillStyle(0x7a4a2a, 1);
-          spotGfx.fillRect(spot.x - 13, spot.y + 4, 26, 18);
+          spotGfx.fillRect(-13, 4, 26, 18);
           spotGfx.fillStyle(0x4a2a1a, 1);
           spotGfx.beginPath();
-          spotGfx.moveTo(spot.x - 16, spot.y + 4);
-          spotGfx.lineTo(spot.x, spot.y - 8);
-          spotGfx.lineTo(spot.x + 16, spot.y + 4);
+          spotGfx.moveTo(-16, 4);
+          spotGfx.lineTo(0, -8);
+          spotGfx.lineTo(16, 4);
           spotGfx.closePath();
           spotGfx.fillPath();
           spotGfx.fillStyle(0x2a1a0a, 1);
-          spotGfx.fillCircle(spot.x, spot.y + 12, 5);
+          spotGfx.fillCircle(0, 12, 5);
           break;
       }
+
+      spotGfx.restore();
     }
   }
 

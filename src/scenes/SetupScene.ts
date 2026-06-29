@@ -8,11 +8,17 @@ import {
   type PlayerChickenColor,
   type SetupSelection,
 } from "../setup/colors";
+import { WORLD_SCALE } from "../match/layout";
 
-const SWATCH_X_POSITIONS = [160, 320, 480, 640] as const;
-const P1_SWATCH_Y = 180;
-const P2_SWATCH_Y = 290;
-const START_BUTTON_Y = 380;
+const SWATCH_X_POSITIONS = [
+  160 * WORLD_SCALE,
+  320 * WORLD_SCALE,
+  480 * WORLD_SCALE,
+  640 * WORLD_SCALE,
+] as const;
+const P1_SWATCH_Y = 180 * WORLD_SCALE;
+const P2_SWATCH_Y = 290 * WORLD_SCALE;
+const START_BUTTON_Y = 380 * WORLD_SCALE;
 
 interface SwatchButton {
   player: 0 | 1;
@@ -37,22 +43,22 @@ export class SetupScene extends Phaser.Scene {
     const { width } = this.scale;
 
     this.add
-      .text(width / 2, 60, "Chicken Olympics", {
-        fontSize: "36px",
+      .text(width / 2, 60 * WORLD_SCALE, "Chicken Olympics", {
+        fontSize: `${36 * WORLD_SCALE}px`,
         color: "#ffffff",
       })
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, 130, "Player 1", {
-        fontSize: "20px",
+      .text(width / 2, 130 * WORLD_SCALE, "Player 1", {
+        fontSize: `${20 * WORLD_SCALE}px`,
         color: "#ffffff",
       })
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, 240, "Player 2", {
-        fontSize: "20px",
+      .text(width / 2, 240 * WORLD_SCALE, "Player 2", {
+        fontSize: `${20 * WORLD_SCALE}px`,
         color: "#ffffff",
       })
       .setOrigin(0.5);
@@ -62,10 +68,10 @@ export class SetupScene extends Phaser.Scene {
 
     this.startButton = this.add
       .text(width / 2, START_BUTTON_Y, "[ Start Match ]", {
-        fontSize: "24px",
+        fontSize: `${24 * WORLD_SCALE}px`,
         color: "#888888",
         backgroundColor: "#222233",
-        padding: { x: 20, y: 10 },
+        padding: { x: 20 * WORLD_SCALE, y: 10 * WORLD_SCALE },
       })
       .setOrigin(0.5);
 
@@ -82,17 +88,17 @@ export class SetupScene extends Phaser.Scene {
 
       const text = this.add
         .text(x, y, label, {
-          fontSize: "18px",
+          fontSize: `${18 * WORLD_SCALE}px`,
           color: "#ffffff",
           backgroundColor: "#" + hex.toString(16).padStart(6, "0"),
-          padding: { x: 16, y: 8 },
+          padding: { x: 16 * WORLD_SCALE, y: 8 * WORLD_SCALE },
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
 
       const marker = this.add
-        .text(x, y + 32, "", {
-          fontSize: "16px",
+        .text(x, y + 32 * WORLD_SCALE, "", {
+          fontSize: `${16 * WORLD_SCALE}px`,
           color: "#ffdd44",
         })
         .setOrigin(0.5);

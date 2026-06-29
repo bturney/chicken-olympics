@@ -48,11 +48,41 @@ export const FARMYARD_LAYOUT: FarmyardLayout = {
   ],
   playerSpeed: 200 * WORLD_SCALE,
   hidingSpots: [
-    { x: 140 * WORLD_SCALE, y: 180 * WORLD_SCALE, type: "bush", name: "Northwest Bush" },
-    { x: 400 * WORLD_SCALE, y: 150 * WORLD_SCALE, type: "hay-bale", name: "North Hay Bale" },
-    { x: 680 * WORLD_SCALE, y: 200 * WORLD_SCALE, type: "barrel", name: "Northeast Barrel" },
-    { x: 200 * WORLD_SCALE, y: 470 * WORLD_SCALE, type: "flower-pot", name: "Southwest Flower Pot" },
-    { x: 560 * WORLD_SCALE, y: 490 * WORLD_SCALE, type: "fence", name: "South Fence" },
-    { x: 400 * WORLD_SCALE, y: 400 * WORLD_SCALE, type: "nest-box", name: "Center Nest Box" },
+    {
+      x: 140 * WORLD_SCALE,
+      y: 180 * WORLD_SCALE,
+      type: "bush",
+      name: "Northwest Bush",
+    },
+    {
+      x: 400 * WORLD_SCALE,
+      y: 150 * WORLD_SCALE,
+      type: "hay-bale",
+      name: "North Hay Bale",
+    },
+    {
+      x: 680 * WORLD_SCALE,
+      y: 200 * WORLD_SCALE,
+      type: "barrel",
+      name: "Northeast Barrel",
+    },
+    {
+      x: 200 * WORLD_SCALE,
+      y: 470 * WORLD_SCALE,
+      type: "flower-pot",
+      name: "Southwest Flower Pot",
+    },
+    {
+      x: 560 * WORLD_SCALE,
+      y: 490 * WORLD_SCALE,
+      type: "fence",
+      name: "South Fence",
+    },
+    {
+      x: 400 * WORLD_SCALE,
+      y: 400 * WORLD_SCALE,
+      type: "nest-box",
+      name: "Center Nest Box",
+    },
   ],
 };

@@ -1,30 +1,14 @@
 import Phaser from "phaser";
 import {
-  createMatchState,
-  tick,
-  isMatchComplete,
-  getRemainingMs,
-  getWinner,
-  createPeekState,
-  tickPeekState,
-  isPeekActive,
-  getActiveNormalSpotIndices,
-  attemptClaim,
   createClaimAnimationState,
   startClaimAnimation,
   getActiveClaimAnimation,
   tickClaimAnimations,
   computeClaimPopScale,
-  createGreenChickState,
-  tickGreenChickState,
-  getActiveGreenChickSpotIndex,
-  attemptGreenChickClaim,
-  type MatchState,
-  type PeekState,
   type ClaimAnimationState,
-  type GreenChickState,
   NORMAL_PEEK_COUNT,
 } from "../match/rules";
+import { Match, type MatchEvent } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
 import { computeMoveVelocity } from "../match/movement";
 import {
@@ -70,9 +54,7 @@ function hexToCssHex(value: number): string {
 }
 
 export class MatchScene extends Phaser.Scene {
-  private matchState!: MatchState;
-  private peekState!: PeekState;
-  private greenChickState!: GreenChickState;
+  private match!: Match;
   private claimAnimationState!: ClaimAnimationState;
   private timerText!: Phaser.GameObjects.Text;
   private p1ScoreText!: Phaser.GameObjects.Text;
@@ -110,12 +92,10 @@ export class MatchScene extends Phaser.Scene {
   create(): void {
     const { width } = this.scale;
 
-    this.matchState = createMatchState();
-    this.peekState = createPeekState(0);
-    this.greenChickState = createGreenChickState(
-      this.matchState.durationMs,
-      () => Math.random(),
-    );
+    this.match = new Match({
+      spotCount: FARMYARD_LAYOUT.hidingSpots.length,
+      random: () => Math.random(),
+    });
     this.claimAnimationState = createClaimAnimationState();
     this.transitioned = false;
     this.chickBodies = [];
@@ -136,62 +116,31 @@ export class MatchScene extends Phaser.Scene {
     this.createOverlaps();
     this.drawBounds();
 
-    this.peekState = tickPeekState(
-      this.peekState,
-      this.matchState.elapsedMs,
-      FARMYARD_LAYOUT.hidingSpots.length,
-      () => Math.random(),
-    );
-    this.greenChickState = tickGreenChickState(
-      this.greenChickState,
-      this.peekState,
-      this.matchState.elapsedMs,
-      FARMYARD_LAYOUT.hidingSpots.length,
-      () => Math.random(),
-    );
+    this.handleMatchEvents(this.match.advance(0));
     this.renderChicks();
+    this.renderGreenChick();
   }
 
   update(_time: number, delta: number): void {
     if (this.transitioned) return;
 
     this.handleMovement();
-    this.matchState = tick(this.matchState, delta);
-    this.peekState = tickPeekState(
-      this.peekState,
-      this.matchState.elapsedMs,
-      FARMYARD_LAYOUT.hidingSpots.length,
-      () => Math.random(),
-    );
-    const previousGreenStatus = this.greenChickState.status;
-    this.greenChickState = tickGreenChickState(
-      this.greenChickState,
-      this.peekState,
-      this.matchState.elapsedMs,
-      FARMYARD_LAYOUT.hidingSpots.length,
-      () => Math.random(),
-    );
-    if (
-      previousGreenStatus !== "active" &&
-      this.greenChickState.status === "active"
-    ) {
-      this.playSfx("greenChickAppear");
-    }
+    this.handleMatchEvents(this.match.advance(delta));
     this.claimAnimationState = tickClaimAnimations(
       this.claimAnimationState,
-      this.matchState.elapsedMs,
+      this.match.view().elapsedMs,
     );
     this.renderChicks();
     this.renderGreenChick();
     this.updateHUD();
 
-    if (isMatchComplete(this.matchState)) {
+    if (this.match.view().complete) {
       this.transitioned = true;
       this.time.delayedCall(500, () => {
-        const winner = getWinner(this.matchState);
+        const view = this.match.view();
         this.scene.start("PodiumScene", {
-          scores: this.matchState.scores,
-          winner,
+          scores: view.scores,
+          winner: view.winner,
           p1Color: this.p1Color,
           p2Color: this.p2Color,
         });
@@ -211,6 +160,31 @@ export class MatchScene extends Phaser.Scene {
   private playSfx(id: MatchSfxId): void {
     this.playedSfx.push(id);
     playSfxMoment(this.sfxScheduler, MATCH_SFX_MOMENTS[id], this.sfxNow());
+  }
+
+  private handleMatchEvents(events: MatchEvent[]): void {
+    for (const event of events) {
+      switch (event.type) {
+        case "normalChickClaimed":
+          this.claimAnimationState = startClaimAnimation(
+            this.claimAnimationState,
+            event.slotIndex,
+            event.spotIndex,
+            event.playerIndex,
+            this.match.view().elapsedMs,
+          );
+          this.playSfx("normalClaim");
+          break;
+        case "greenChickAppeared":
+          this.playSfx("greenChickAppear");
+          break;
+        case "greenChickClaimed":
+          this.playSfx("greenChickClaim");
+          break;
+        case "greenChickMissed":
+          break;
+      }
+    }
   }
 
   private createHUD(width: number): void {
@@ -343,51 +317,22 @@ export class MatchScene extends Phaser.Scene {
     const chickBody = this.chickBodies[slotIndex];
     if (!chickBody || !chickBody.visible) return;
 
-    const slot = this.peekState.peeks[slotIndex];
-    if (!slot || slot.activeSpotIndex === null) return;
+    const chick = this.match
+      .view()
+      .normalChicks.find((visible) => visible.slotIndex === slotIndex);
+    if (!chick) return;
 
-    const result = attemptClaim(
-      this.matchState,
-      this.peekState,
-      slot.activeSpotIndex,
-      playerIndex,
-      this.matchState.elapsedMs,
-      () => Math.random(),
-    );
-
-    if (result.claimed) {
-      this.matchState = result.matchState;
-      this.peekState = result.peekState;
-      this.claimAnimationState = startClaimAnimation(
-        this.claimAnimationState,
-        slotIndex,
-        slot.activeSpotIndex,
-        playerIndex,
-        this.matchState.elapsedMs,
-      );
-      this.playSfx("normalClaim");
-      this.updateHUD();
-    }
+    this.handleMatchEvents(this.match.claim(chick.spotIndex, playerIndex));
+    this.updateHUD();
   }
 
   private handleGreenChickClaim(playerIndex: 0 | 1): void {
     if (!this.greenChickBody.visible) return;
-    if (this.greenChickState.activeSpotIndex === null) return;
+    const greenChick = this.match.view().greenChick;
+    if (!greenChick) return;
 
-    const result = attemptGreenChickClaim(
-      this.matchState,
-      this.greenChickState,
-      this.greenChickState.activeSpotIndex,
-      playerIndex,
-      this.matchState.elapsedMs,
-    );
-
-    if (result.claimed) {
-      this.matchState = result.matchState;
-      this.greenChickState = result.greenChickState;
-      this.playSfx("greenChickClaim");
-      this.updateHUD();
-    }
+    this.handleMatchEvents(this.match.claim(greenChick.spotIndex, playerIndex));
+    this.updateHUD();
   }
 
   private createHidingSpots(): void {
@@ -516,34 +461,32 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private renderChicks(): void {
-    const now = this.matchState.elapsedMs;
-    const activeSpots = new Set(
-      getActiveNormalSpotIndices(this.peekState, now),
-    );
+    const view = this.match.view();
     for (let slotIndex = 0; slotIndex < NORMAL_PEEK_COUNT; slotIndex++) {
       const body = this.chickBodies[slotIndex]!;
-      const peek = this.peekState.peeks[slotIndex]!;
+      const visibleChick = view.normalChicks.find(
+        (chick) => chick.slotIndex === slotIndex,
+      );
       const claimAnimation = getActiveClaimAnimation(
         this.claimAnimationState,
         slotIndex,
-        now,
+        view.elapsedMs,
       );
 
       if (claimAnimation !== null) {
         const spot = FARMYARD_LAYOUT.hidingSpots[claimAnimation.spotIndex]!;
         const color = this.getPlayerColor(claimAnimation.playerIndex);
-        const scale = computeClaimPopScale(claimAnimation.startedAtMs, now);
+        const scale = computeClaimPopScale(
+          claimAnimation.startedAtMs,
+          view.elapsedMs,
+        );
         body.setPosition(spot.x, spot.y);
         body.setTint(color);
         body.setScale(scale);
         body.body!.enable = false;
         body.setVisible(true);
-      } else if (
-        peek.activeSpotIndex !== null &&
-        isPeekActive(peek, now) &&
-        activeSpots.has(peek.activeSpotIndex)
-      ) {
-        const spot = FARMYARD_LAYOUT.hidingSpots[peek.activeSpotIndex]!;
+      } else if (visibleChick) {
+        const spot = FARMYARD_LAYOUT.hidingSpots[visibleChick.spotIndex]!;
         body.setPosition(spot.x, spot.y);
         body.setTint(0xffffff);
         body.setScale(1);
@@ -559,8 +502,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private renderGreenChick(): void {
-    const now = this.matchState.elapsedMs;
-    const activeSpot = getActiveGreenChickSpotIndex(this.greenChickState, now);
+    const activeSpot = this.match.view().greenChick?.spotIndex ?? null;
 
     if (activeSpot === null) {
       if (this.greenChickBody.visible) {
@@ -592,13 +534,14 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private updateHUD(): void {
-    const remaining = getRemainingMs(this.matchState);
+    const view = this.match.view();
+    const remaining = view.remainingMs;
     const seconds = (remaining / 1000).toFixed(1);
     this.timerText.setText(`Time: ${seconds}s`);
 
     const p1Label = getPlayerChickenColorLabel(this.p1Color);
     const p2Label = getPlayerChickenColorLabel(this.p2Color);
-    this.p1ScoreText.setText(`P1 (${p1Label}): ${this.matchState.scores[0]}`);
-    this.p2ScoreText.setText(`P2 (${p2Label}): ${this.matchState.scores[1]}`);
+    this.p1ScoreText.setText(`P1 (${p1Label}): ${view.scores[0]}`);
+    this.p2ScoreText.setText(`P2 (${p2Label}): ${view.scores[1]}`);
   }
 }

@@ -47,3 +47,15 @@ _Avoid_: Capture, tag, collect
 **Green Chick**:
 A once-per-match rare chick worth five points when claimed.
 _Avoid_: Bonus chick, rare target
+
+**Match Runtime**:
+The deep module that owns match state — scores, elapsed time, normal peeks, the green chick, and spot occupancy — behind a small stateful interface (advance, claim, query) that emits match events. Scenes drive it and never reach inside. Replaces the former bag of pure rules functions.
+_Avoid_: Rules module, game state, engine
+
+**Arena**:
+The single source of truth for hiding-spot occupancy inside the match runtime: it holds which spots are taken, enforces at most one occupant per spot, and allocates a free spot to a peeking chick on request.
+_Avoid_: Spot map, grid, board
+
+**Match Event**:
+A discrete thing the match runtime reports as it advances — a chick was claimed, the green chick appeared, the green chick was missed. Scenes consume these to play sound and animate, instead of polling and edge-detecting state changes.
+_Avoid_: Signal, notification, message

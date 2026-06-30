@@ -13,8 +13,9 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e:setup": "playwright install --with-deps firefox",
     "test:e2e": "playwright test",
-    "test:e2e:ci": "LD_LIBRARY_PATH=/tmp/opencode/libasound-extract/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH playwright test"
+    "test:e2e:ci": "playwright test"
   },
   "dependencies": {
     "phaser": "^4.2.0"

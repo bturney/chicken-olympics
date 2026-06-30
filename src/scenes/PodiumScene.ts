@@ -4,6 +4,7 @@ import {
   getPlayerChickenHex,
   type PlayerChickenColor,
 } from "../setup/colors";
+import { generateTextureOnce } from "./textures";
 import {
   playSfxMoment,
   SFX_PODIUM_FANFARE,
@@ -153,22 +154,28 @@ export class PodiumScene extends Phaser.Scene {
     blockWidth: number,
     blockHeight: number,
   ): void {
-    const gfx = this.make.graphics({ x: 0, y: 0 }, false);
-    const radius = 6 * WORLD_SCALE;
-    const topStrip = 8 * WORLD_SCALE;
-    gfx.fillStyle(podiumBlockHex(label), 1);
-    gfx.fillRoundedRect(0, 0, blockWidth, blockHeight, radius);
-    gfx.fillStyle(PODIUM_BLOCK_TOP, 1);
-    gfx.fillRoundedRect(0, 0, blockWidth, topStrip, {
-      tl: radius,
-      tr: radius,
-      bl: 0,
-      br: 0,
+    generateTextureOnce({
+      key: podiumBlockTextureKey(label),
+      width: blockWidth,
+      height: blockHeight,
+      exists: (key) => this.textures.exists(key),
+      createGraphics: () => this.make.graphics({ x: 0, y: 0 }, false),
+      draw: (gfx) => {
+        const radius = 6 * WORLD_SCALE;
+        const topStrip = 8 * WORLD_SCALE;
+        gfx.fillStyle(podiumBlockHex(label), 1);
+        gfx.fillRoundedRect(0, 0, blockWidth, blockHeight, radius);
+        gfx.fillStyle(PODIUM_BLOCK_TOP, 1);
+        gfx.fillRoundedRect(0, 0, blockWidth, topStrip, {
+          tl: radius,
+          tr: radius,
+          bl: 0,
+          br: 0,
+        });
+        gfx.lineStyle(2 * WORLD_SCALE, PODIUM_BLOCK_FRONT, 1);
+        gfx.strokeRoundedRect(0, 0, blockWidth, blockHeight, radius);
+      },
     });
-    gfx.lineStyle(2 * WORLD_SCALE, PODIUM_BLOCK_FRONT, 1);
-    gfx.strokeRoundedRect(0, 0, blockWidth, blockHeight, radius);
-    gfx.generateTexture(podiumBlockTextureKey(label), blockWidth, blockHeight);
-    gfx.destroy();
   }
 
   private drawGround(width: number, height: number): void {
@@ -245,17 +252,19 @@ export class PodiumScene extends Phaser.Scene {
   }
 
   private createPlayerTexture(player: 1 | 2, color: PlayerChickenColor): void {
-    const gfx = this.make.graphics({ x: 0, y: 0 }, false);
-    gfx.fillStyle(getPlayerChickenHex(color), 1);
-    gfx.fillCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
-    gfx.lineStyle(2 * WORLD_SCALE, 0x222222, 1);
-    gfx.strokeCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
-    gfx.generateTexture(
-      podiumTextureKey(player, color),
-      PLAYER_RADIUS * 2,
-      PLAYER_RADIUS * 2,
-    );
-    gfx.destroy();
+    generateTextureOnce({
+      key: podiumTextureKey(player, color),
+      width: PLAYER_RADIUS * 2,
+      height: PLAYER_RADIUS * 2,
+      exists: (key) => this.textures.exists(key),
+      createGraphics: () => this.make.graphics({ x: 0, y: 0 }, false),
+      draw: (gfx) => {
+        gfx.fillStyle(getPlayerChickenHex(color), 1);
+        gfx.fillCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
+        gfx.lineStyle(2 * WORLD_SCALE, 0x222222, 1);
+        gfx.strokeCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
+      },
+    });
   }
 
   private drawTitle(width: number): void {

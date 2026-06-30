@@ -1060,6 +1060,14 @@ async function completeShortMatchForTest(
 test("Play Again on the Podium Ceremony returns to setup with a fresh Player Chicken color selection", async ({
   page,
 }) => {
+  const duplicateTextureWarnings: string[] = [];
+  page.on("console", (message) => {
+    const text = message.text();
+    if (text.includes("Texture key already exists")) {
+      duplicateTextureWarnings.push(text);
+    }
+  });
+
   await page.goto("/");
 
   const canvas = page.locator("canvas");
@@ -1087,4 +1095,16 @@ test("Play Again on the Podium Ceremony returns to setup with a fresh Player Chi
     expect(await getSwatchEnabled(page, 0, color)).toBe(true);
     expect(await getSwatchEnabled(page, 1, color)).toBe(true);
   }
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await completeShortMatchForTest(page, [2, 4], 2_000);
+
+  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
+
+  expect(duplicateTextureWarnings).toEqual([]);
 });

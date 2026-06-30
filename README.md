@@ -42,11 +42,13 @@ Run the Playwright smoke tests:
 npm run test:e2e
 ```
 
-If Firefox fails to launch because a system audio library is missing in this environment, use the CI-style script:
+On a new Linux machine, install the Playwright Firefox browser and its system dependencies first:
 
 ```bash
-npm run test:e2e:ci
+npm run test:e2e:setup
 ```
+
+This setup command may prompt for `sudo` on Linux because browser system libraries are installed through the OS package manager.
 
 ## Quality Gate
 
@@ -61,7 +63,7 @@ npm run test:e2e
 npm run build
 ```
 
-If `npm run test:e2e` fails only because of missing local browser system libraries, run `npm run test:e2e:ci` and include that result in your notes.
+If `npm run test:e2e` fails because local browser system libraries are missing, run `npm run test:e2e:setup` once, then rerun `npm run test:e2e`.
 
 ## Build
 

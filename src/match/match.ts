@@ -147,7 +147,9 @@ export class Match {
 
   view(): MatchView {
     const now = this.matchState.elapsedMs;
-    const activeSpots = new Set(getActiveNormalSpotIndices(this.peekState, now));
+    const activeSpots = new Set(
+      getActiveNormalSpotIndices(this.peekState, now),
+    );
     return {
       scores: this.matchState.scores,
       elapsedMs: this.matchState.elapsedMs,

@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import {
   computeClaimPopScale,
   NORMAL_PEEK_COUNT,
+  NORMAL_CHICK_POINTS,
 } from "../match/rules";
 import { Match, type MatchEvent } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
@@ -41,6 +42,10 @@ interface MatchSceneData {
   p2Color?: PlayerChickenColor;
 }
 
+interface ClaimScoreEcho {
+  text: Phaser.GameObjects.Text;
+}
+
 function playerTextureKey(player: 1 | 2, color: PlayerChickenColor): string {
   return `p${player}_chicken_${color}`;
 }
@@ -68,6 +73,7 @@ export class MatchScene extends Phaser.Scene {
   private sfxScheduler: SfxScheduler = { schedule: () => {} };
   private sfxNow: () => number = () => 0;
   readonly playedSfx: MatchSfxId[] = [];
+  readonly claimScoreEchoes: ClaimScoreEcho[] = [];
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -123,6 +129,7 @@ export class MatchScene extends Phaser.Scene {
     this.handleMovement();
     this.handleMatchEvents(this.match.advance(delta));
     this.presentationFeedback.tick(this.match.view().elapsedMs);
+    this.cleanupClaimScoreEchoes();
     this.renderChicks();
     this.renderGreenChick();
     this.updateHUD();
@@ -165,6 +172,12 @@ export class MatchScene extends Phaser.Scene {
             event.playerIndex,
             this.match.view().elapsedMs,
           );
+          this.spawnClaimScoreEcho(
+            event.spotIndex,
+            event.playerIndex,
+            NORMAL_CHICK_POINTS,
+          );
+          this.bumpScoreText(event.playerIndex);
           this.playSfx("normalClaim");
           break;
         case "greenChickAppeared":
@@ -325,6 +338,71 @@ export class MatchScene extends Phaser.Scene {
 
     this.handleMatchEvents(this.match.claim(greenChick.spotIndex, playerIndex));
     this.updateHUD();
+  }
+
+  private spawnClaimScoreEcho(
+    spotIndex: number,
+    playerIndex: 0 | 1,
+    points: number,
+  ): void {
+    const spot = FARMYARD_LAYOUT.hidingSpots[spotIndex];
+    if (!spot) return;
+
+    const echo = this.add
+      .text(spot.x, spot.y - 18 * WORLD_SCALE, `+${points}`, {
+        fontSize: `${18 * WORLD_SCALE}px`,
+        color: hexToCssHex(this.getPlayerColor(playerIndex)),
+        stroke: "#000000",
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(20);
+
+    echo.setData("expiresAtMs", this.match.view().elapsedMs + 650);
+    this.claimScoreEchoes.push({ text: echo });
+
+    this.tweens.add({
+      targets: echo,
+      y: echo.y - 16 * WORLD_SCALE,
+      alpha: 0,
+      duration: 650,
+      ease: "Quad.Out",
+      onComplete: () => {
+        this.removeClaimScoreEcho(echo);
+      },
+    });
+  }
+
+  private bumpScoreText(playerIndex: 0 | 1): void {
+    const scoreText = playerIndex === 0 ? this.p1ScoreText : this.p2ScoreText;
+    this.tweens.killTweensOf(scoreText);
+    scoreText.setScale(1.12);
+    this.tweens.add({
+      targets: scoreText,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 180,
+      ease: "Quad.Out",
+    });
+  }
+
+  private cleanupClaimScoreEchoes(): void {
+    const now = this.match.view().elapsedMs;
+    for (const echo of [...this.claimScoreEchoes]) {
+      const expiresAtMs = echo.text.getData("expiresAtMs");
+      if (typeof expiresAtMs === "number" && now >= expiresAtMs) {
+        this.removeClaimScoreEcho(echo.text);
+      }
+    }
+  }
+
+  private removeClaimScoreEcho(text: Phaser.GameObjects.Text): void {
+    const index = this.claimScoreEchoes.findIndex((echo) => echo.text === text);
+    if (index !== -1) {
+      this.claimScoreEchoes.splice(index, 1);
+    }
+    if (!text.scene) return;
+    text.destroy();
   }
 
   private createHidingSpots(): void {

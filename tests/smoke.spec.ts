@@ -497,9 +497,20 @@ interface ClaimFeedbackProbe {
     scaleY: number;
     visible: boolean;
   }>;
+  claimScoreEchoes: Array<{
+    text: string;
+    x: number;
+    y: number;
+    alpha: number;
+    visible: boolean;
+  }>;
   scores: [number, number];
   p1ScoreText: string;
   p2ScoreText: string;
+  p1ScoreScaleX: number;
+  p1ScoreScaleY: number;
+  p2ScoreScaleX: number;
+  p2ScoreScaleY: number;
   activeClaimAnimationCount: number;
   elapsedMs: number;
   animationDetails: Array<{
@@ -524,9 +535,18 @@ function probeClaimFeedback(
         scaleY: number;
         visible: boolean;
       }>;
+      claimScoreEchoes: Array<{
+        text: {
+          text: string;
+          x: number;
+          y: number;
+          alpha: number;
+          visible: boolean;
+        };
+      }>;
       matchState: { scores: [number, number]; elapsedMs: number };
-      p1ScoreText: { text: string };
-      p2ScoreText: { text: string };
+      p1ScoreText: { text: string; scaleX: number; scaleY: number };
+      p2ScoreText: { text: string; scaleX: number; scaleY: number };
       presentationFeedback: {
         claimAnimations: Array<{
           slotIndex: number;
@@ -542,9 +562,20 @@ function probeClaimFeedback(
         scaleY: b.scaleY,
         visible: b.visible,
       })),
+      claimScoreEchoes: match.claimScoreEchoes.map((echo) => ({
+        text: echo.text.text,
+        x: echo.text.x,
+        y: echo.text.y,
+        alpha: echo.text.alpha,
+        visible: echo.text.visible,
+      })),
       scores: match.matchState.scores,
       p1ScoreText: match.p1ScoreText.text,
       p2ScoreText: match.p2ScoreText.text,
+      p1ScoreScaleX: match.p1ScoreText.scaleX,
+      p1ScoreScaleY: match.p1ScoreText.scaleY,
+      p2ScoreScaleX: match.p2ScoreText.scaleX,
+      p2ScoreScaleY: match.p2ScoreText.scaleY,
       activeClaimAnimationCount: match.presentationFeedback.claimAnimations.length,
       elapsedMs: match.matchState.elapsedMs,
       animationDetails: match.presentationFeedback.claimAnimations.map((a) => ({
@@ -600,6 +631,13 @@ test("claiming a normal Chick tints it the claiming player's color, pops it, and
 
   const after = await probeClaimFeedback(page);
   expect(after).not.toBeNull();
+  expect(after!.claimScoreEchoes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ text: "+1", visible: true }),
+    ]),
+  );
+  expect(after!.p1ScoreScaleX).toBeGreaterThan(1);
+  expect(after!.p1ScoreScaleY).toBeGreaterThan(1);
   const claimed = after!.chickBodies.find((b) => b.tintTopLeft === 0x4488ff);
   expect(claimed).toBeDefined();
   expect(claimed?.visible).toBe(true);

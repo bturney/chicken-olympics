@@ -12,6 +12,7 @@ import {
   getPlayerChickenHex,
   type PlayerChickenColor,
 } from "../setup/colors";
+import { computeChickenCursorPersonality } from "./chickenCursorPersonality";
 import {
   playSfxMoment,
   SFX_NORMAL_CHICK_CLAIM,
@@ -77,6 +78,8 @@ export class MatchScene extends Phaser.Scene {
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
+  private p1Shadow!: Phaser.GameObjects.Ellipse;
+  private p2Shadow!: Phaser.GameObjects.Ellipse;
   private chickBodies: Phaser.Physics.Arcade.Sprite[] = [];
   private greenChickBody!: Phaser.Physics.Arcade.Sprite;
   private peekAnticipationLayer!: Phaser.GameObjects.Graphics;
@@ -143,6 +146,7 @@ export class MatchScene extends Phaser.Scene {
     this.handleMovement();
     this.handleMatchEvents(this.match.advance(delta));
     this.presentationFeedback.tick(this.match.view().elapsedMs);
+    this.updatePlayerChickenPersonality(this.match.view().elapsedMs);
     this.tickGreenClaimBeat();
     this.cleanupClaimScoreEchoes();
     this.renderChicks();
@@ -246,26 +250,26 @@ export class MatchScene extends Phaser.Scene {
   private createPlayers(): void {
     const gfx = this.add.graphics();
 
-    gfx.fillStyle(getPlayerChickenHex(this.p1Color));
-    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
-    gfx.generateTexture(
-      playerTextureKey(1, this.p1Color),
-      PLAYER_SIZE * 2,
-      PLAYER_SIZE * 2,
-    );
+    this.drawPlayerChickenTexture(gfx, 1, this.p1Color);
+    gfx.generateTexture(playerTextureKey(1, this.p1Color), PLAYER_SIZE * 2, PLAYER_SIZE * 2);
 
     gfx.clear();
-    gfx.fillStyle(getPlayerChickenHex(this.p2Color));
-    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
-    gfx.generateTexture(
-      playerTextureKey(2, this.p2Color),
-      PLAYER_SIZE * 2,
-      PLAYER_SIZE * 2,
-    );
+    this.drawPlayerChickenTexture(gfx, 2, this.p2Color);
+    gfx.generateTexture(playerTextureKey(2, this.p2Color), PLAYER_SIZE * 2, PLAYER_SIZE * 2);
 
     gfx.destroy();
 
     const [p1Start, p2Start] = FARMYARD_LAYOUT.playerStartPositions;
+
+    this.p1Shadow = this.add.ellipse(
+      p1Start.x,
+      p1Start.y + PLAYER_SIZE * 0.68,
+      PLAYER_SIZE * 1.05,
+      PLAYER_SIZE * 0.42,
+      0x000000,
+      0.18,
+    );
+    this.p1Shadow.setDepth(1);
 
     this.p1Chicken = this.physics.add.sprite(
       p1Start.x,
@@ -273,12 +277,24 @@ export class MatchScene extends Phaser.Scene {
       playerTextureKey(1, this.p1Color),
     );
     this.p1Chicken.setCollideWorldBounds(true);
+    this.p1Chicken.setDepth(2);
     this.p1Label = this.add
       .text(p1Start.x, p1Start.y + PLAYER_SIZE + 4 * WORLD_SCALE, "P1", {
         fontSize: `${14 * WORLD_SCALE}px`,
         color: hexToCssHex(getPlayerChickenHex(this.p1Color)),
       })
       .setOrigin(0.5);
+    this.p1Label.setDepth(3);
+
+    this.p2Shadow = this.add.ellipse(
+      p2Start.x,
+      p2Start.y + PLAYER_SIZE * 0.68,
+      PLAYER_SIZE * 1.05,
+      PLAYER_SIZE * 0.42,
+      0x000000,
+      0.18,
+    );
+    this.p2Shadow.setDepth(1);
 
     this.p2Chicken = this.physics.add.sprite(
       p2Start.x,
@@ -286,12 +302,87 @@ export class MatchScene extends Phaser.Scene {
       playerTextureKey(2, this.p2Color),
     );
     this.p2Chicken.setCollideWorldBounds(true);
+    this.p2Chicken.setDepth(2);
     this.p2Label = this.add
       .text(p2Start.x, p2Start.y + PLAYER_SIZE + 4 * WORLD_SCALE, "P2", {
         fontSize: `${14 * WORLD_SCALE}px`,
         color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
       })
       .setOrigin(0.5);
+    this.p2Label.setDepth(3);
+  }
+
+  private drawPlayerChickenTexture(
+    gfx: Phaser.GameObjects.Graphics,
+    playerIndex: 1 | 2,
+    color: PlayerChickenColor,
+  ): void {
+    const bodyColor = getPlayerChickenHex(color);
+    const outlineColor = 0x2d1f16;
+    const wingColor = 0xe0b14a;
+    const beakColor = 0xffbf4d;
+    const combColor = 0xff5d7a;
+    const eyeColor = 0x241a14;
+    const feetColor = 0xc87a2e;
+    const facing = playerIndex === 1 ? 1 : -1;
+
+    gfx.fillStyle(0x000000, 0);
+    gfx.fillRect(0, 0, PLAYER_SIZE * 2, PLAYER_SIZE * 2);
+
+    gfx.fillStyle(bodyColor, 1);
+    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE - 1);
+
+    gfx.fillStyle(wingColor, 1);
+    gfx.fillEllipse(PLAYER_SIZE - facing * 6, PLAYER_SIZE + 3, 13, 17);
+
+    gfx.fillStyle(outlineColor, 1);
+    gfx.strokeCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE - 1);
+    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE + 4, PLAYER_SIZE - 11);
+
+    gfx.fillStyle(combColor, 1);
+    gfx.fillTriangle(
+      PLAYER_SIZE - 6,
+      PLAYER_SIZE - 17,
+      PLAYER_SIZE - 1,
+      PLAYER_SIZE - 25,
+      PLAYER_SIZE + 5,
+      PLAYER_SIZE - 15,
+    );
+
+    gfx.fillStyle(beakColor, 1);
+    gfx.fillTriangle(
+      PLAYER_SIZE + facing * 8,
+      PLAYER_SIZE - 1,
+      PLAYER_SIZE + facing * 18,
+      PLAYER_SIZE + 3,
+      PLAYER_SIZE + facing * 8,
+      PLAYER_SIZE + 7,
+    );
+
+    gfx.fillStyle(0xffffff, 1);
+    gfx.fillCircle(PLAYER_SIZE + facing * 6, PLAYER_SIZE - 7, 3.2);
+    gfx.fillStyle(eyeColor, 1);
+    gfx.fillCircle(PLAYER_SIZE + facing * 7, PLAYER_SIZE - 7, 1.3);
+
+    gfx.lineStyle(3, feetColor, 1);
+    gfx.beginPath();
+    gfx.moveTo(PLAYER_SIZE - 6, PLAYER_SIZE + 16);
+    gfx.lineTo(PLAYER_SIZE - 6, PLAYER_SIZE + 24);
+    gfx.moveTo(PLAYER_SIZE - 2, PLAYER_SIZE + 16);
+    gfx.lineTo(PLAYER_SIZE - 2, PLAYER_SIZE + 24);
+    gfx.moveTo(PLAYER_SIZE + 3, PLAYER_SIZE + 16);
+    gfx.lineTo(PLAYER_SIZE + 3, PLAYER_SIZE + 24);
+    gfx.strokePath();
+
+    gfx.lineStyle(2, feetColor, 1);
+    gfx.beginPath();
+    gfx.moveTo(PLAYER_SIZE - 8, PLAYER_SIZE + 24);
+    gfx.lineTo(PLAYER_SIZE - 11, PLAYER_SIZE + 28);
+    gfx.moveTo(PLAYER_SIZE - 6, PLAYER_SIZE + 24);
+    gfx.lineTo(PLAYER_SIZE - 2, PLAYER_SIZE + 28);
+    gfx.moveTo(PLAYER_SIZE + 1, PLAYER_SIZE + 24);
+    gfx.lineTo(PLAYER_SIZE + 5, PLAYER_SIZE + 28);
+    gfx.strokePath();
   }
 
   private createChicks(): void {
@@ -559,6 +650,56 @@ export class MatchScene extends Phaser.Scene {
       MOVE_SPEED,
     );
     this.p2Chicken.setVelocity(p2Velocity.vx, p2Velocity.vy);
+  }
+
+  private updatePlayerChickenPersonality(elapsedMs: number): void {
+    const p1Body = this.p1Chicken.body as Phaser.Physics.Arcade.Body | null;
+    const p1Personality = computeChickenCursorPersonality(
+      {
+        vx: p1Body?.velocity.x ?? 0,
+        vy: p1Body?.velocity.y ?? 0,
+      },
+      elapsedMs,
+      0,
+    );
+    this.p1Chicken.setAngle(p1Personality.angle);
+    this.p1Shadow.setPosition(
+      this.p1Chicken.x,
+      this.p1Chicken.y + PLAYER_SIZE * 0.68 + p1Personality.shadowYOffset,
+    );
+    this.p1Shadow.setScale(
+      p1Personality.shadowScaleX,
+      p1Personality.shadowScaleY,
+    );
+    this.p1Shadow.setAlpha(p1Personality.shadowAlpha);
+    this.p1Label.setPosition(
+      this.p1Chicken.x,
+      this.p1Chicken.y + PLAYER_SIZE + 4 * WORLD_SCALE + p1Personality.shadowYOffset * 0.15,
+    );
+
+    const p2Body = this.p2Chicken.body as Phaser.Physics.Arcade.Body | null;
+    const p2Personality = computeChickenCursorPersonality(
+      {
+        vx: p2Body?.velocity.x ?? 0,
+        vy: p2Body?.velocity.y ?? 0,
+      },
+      elapsedMs,
+      1,
+    );
+    this.p2Chicken.setAngle(p2Personality.angle);
+    this.p2Shadow.setPosition(
+      this.p2Chicken.x,
+      this.p2Chicken.y + PLAYER_SIZE * 0.68 + p2Personality.shadowYOffset,
+    );
+    this.p2Shadow.setScale(
+      p2Personality.shadowScaleX,
+      p2Personality.shadowScaleY,
+    );
+    this.p2Shadow.setAlpha(p2Personality.shadowAlpha);
+    this.p2Label.setPosition(
+      this.p2Chicken.x,
+      this.p2Chicken.y + PLAYER_SIZE + 4 * WORLD_SCALE + p2Personality.shadowYOffset * 0.15,
+    );
   }
 
   private renderChicks(): void {

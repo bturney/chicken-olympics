@@ -124,6 +124,30 @@ function getMatchTextureColor(
   }, textureKey);
 }
 
+function getMatchTexturePixel(
+  page: import("@playwright/test").Page,
+  textureKey: string,
+  x: number,
+  y: number,
+): Promise<{ r: number; g: number; b: number; a: number } | null> {
+  return page.evaluate(
+    ({ key, x, y }) => {
+      const game = window.__CHICKEN_OLYMPICS__;
+      if (!game) return null;
+      const textureManager = game.textures;
+      const texture = textureManager.get(key);
+      if (!texture) return null;
+      const source = texture.getSourceImage() as HTMLCanvasElement | null;
+      if (!source) return null;
+      const ctx = source.getContext("2d");
+      if (!ctx) return null;
+      const pixel = ctx.getImageData(x, y, 1, 1).data;
+      return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0, a: pixel[3] ?? 0 };
+    },
+    { key: textureKey, x, y },
+  );
+}
+
 function cssHexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const match = /^#?([0-9a-f]{6})$/i.exec(hex);
   if (!match) return null;
@@ -245,6 +269,39 @@ test("Match scene renders Player Chicken textures and HUD in the selected colors
   const p2TextureColor = await getMatchTextureColor(page, "p2_chicken_orange");
   expect(p1TextureColor).toEqual(EXPECTED_HEX.purple);
   expect(p2TextureColor).toEqual(EXPECTED_HEX.orange);
+});
+
+test("Match scene gives each Player Chicken a mirrored beak and a more chicken-like silhouette", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  const p1Beak = await getMatchTexturePixel(page, "p1_chicken_blue", 42, 31);
+  const p2Beak = await getMatchTexturePixel(page, "p2_chicken_red", 14, 31);
+  const p1Center = await getMatchTextureColor(page, "p1_chicken_blue");
+
+  expect(p1Beak).not.toBeNull();
+  expect(p2Beak).not.toBeNull();
+  expect(p1Center).not.toBeNull();
+
+  const beak = cssHexToRgb("#ffbf4d");
+  expect(beak).not.toBeNull();
+  expect(p1Beak).toEqual(beak);
+  expect(p2Beak).toEqual(beak);
+  expect(p1Beak).not.toEqual(p1Center);
 });
 
 interface ProductionMatchDefaultsProbe {

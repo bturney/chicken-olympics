@@ -3,7 +3,9 @@ interface GeneratedTextureGraphics {
   destroy(): void;
 }
 
-interface GenerateTextureOnceOptions<Graphics extends GeneratedTextureGraphics> {
+interface GenerateTextureOnceOptions<
+  Graphics extends GeneratedTextureGraphics,
+> {
   key: string;
   width: number;
   height: number;

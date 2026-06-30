@@ -87,9 +87,7 @@ describe("Match", () => {
 
     const events = match.advance(2_000);
 
-    expect(events).toEqual([
-      { type: "greenChickAppeared", spotIndex: 3 },
-    ]);
+    expect(events).toEqual([{ type: "greenChickAppeared", spotIndex: 3 }]);
     expect(match.view().greenChick).toEqual({ spotIndex: 3 });
     expect(match.view().normalChicks.map((chick) => chick.spotIndex)).toEqual([
       0, 1, 2,

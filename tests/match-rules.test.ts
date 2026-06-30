@@ -835,28 +835,27 @@ describe("selectFreeSpotIndex", () => {
   });
 
   it("returns a free spot when at least one is available", () => {
-    const state = tickPeekState(
-      createPeekState(),
-      0,
-      NORMAL_PEEK_COUNT,
-      constantRandom(0.5),
-    );
+    const state = createPeekState();
 
     const free = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.0);
-    expect(free).toBe(NORMAL_PEEK_COUNT);
+    expect(free).toBe(0);
   });
 
   it("picks deterministically based on the random value", () => {
-    const state = tickPeekState(
-      createPeekState(),
-      0,
-      NORMAL_PEEK_COUNT,
-      constantRandom(0.5),
-    );
+    const state = createPeekState();
 
     const a = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.0);
     const b = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.999);
     expect(a).not.toBe(b);
+  });
+
+  it("prefers the farthest free spot from recent selections when avoiding a cluster", () => {
+    const state = {
+      ...createPeekState(),
+      recentSpotIndices: [1, 0],
+    };
+
+    expect(selectFreeSpotIndex(state, 0, 6, 0)).toBe(4);
   });
 });
 

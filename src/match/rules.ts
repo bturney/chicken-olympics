@@ -1,3 +1,5 @@
+import { FARMYARD_LAYOUT } from "./layout";
+
 export interface MatchOptions {
   durationMs?: number;
 }
@@ -243,7 +245,10 @@ export interface NormalPeek {
 
 export interface PeekState {
   peeks: NormalPeek[];
+  recentSpotIndices: number[];
 }
+
+const RECENT_SPOT_MEMORY = 2;
 
 export function createPeekState(now: number = 0): PeekState {
   return {
@@ -252,6 +257,17 @@ export function createPeekState(now: number = 0): PeekState {
       peekStartedAtMs: null,
       nextRefillAtMs: now,
     })),
+    recentSpotIndices: [],
+  };
+}
+
+function rememberSpot(peekState: PeekState, spotIndex: number): PeekState {
+  return {
+    ...peekState,
+    recentSpotIndices: [
+      spotIndex,
+      ...peekState.recentSpotIndices.filter((recent) => recent !== spotIndex),
+    ].slice(0, RECENT_SPOT_MEMORY),
   };
 }
 
@@ -295,8 +311,47 @@ export function selectFreeSpotIndex(
     if (!active.has(i)) free.push(i);
   }
   if (free.length === 0) return null;
-  const index = Math.floor(randomValue * free.length);
-  return free[Math.min(index, free.length - 1)] ?? null;
+
+  const recent = peekState.recentSpotIndices.filter((spot) => spot < spotCount);
+  const recentSet = new Set(recent);
+  const candidates =
+    recent.length > 0
+      ? free.filter((spot) => !recentSet.has(spot))
+      : free;
+  const pool = candidates.length > 0 ? candidates : free;
+
+  let bestDistance = -1;
+  const scored = pool.map((spot) => {
+    let distance = 0;
+    if (recent.length > 0) {
+      const spotPosition = FARMYARD_LAYOUT.hidingSpots[spot];
+      if (spotPosition !== undefined) {
+        let shortest = Number.POSITIVE_INFINITY;
+        for (const recentSpot of recent) {
+          const recentPosition = FARMYARD_LAYOUT.hidingSpots[recentSpot];
+          if (recentPosition === undefined) continue;
+          const dx = spotPosition.x - recentPosition.x;
+          const dy = spotPosition.y - recentPosition.y;
+          const d = Math.hypot(dx, dy);
+          if (d < shortest) shortest = d;
+        }
+        if (shortest !== Number.POSITIVE_INFINITY) {
+          distance = shortest;
+        }
+      }
+    }
+    if (distance > bestDistance) {
+      bestDistance = distance;
+    }
+    return { spot, distance };
+  });
+
+  const best =
+    recent.length > 0
+      ? scored.filter((candidate) => candidate.distance === bestDistance)
+      : scored;
+  const index = Math.floor(randomValue * best.length);
+  return best[Math.min(index, best.length - 1)]?.spot ?? null;
 }
 
 function fillSlotAt(
@@ -336,7 +391,7 @@ export function tickPeekState(
       if (currentTimeMs - peek.peekStartedAtMs >= NORMAL_PEEK_DURATION_MS) {
         const expired = expireSlot(peek, currentTimeMs, random);
         peeks.push(expired);
-        workingState = { peeks };
+        workingState = rememberSpot({ ...workingState, peeks }, peek.activeSpotIndex);
       } else {
         peeks.push(peek);
       }
@@ -353,7 +408,7 @@ export function tickPeekState(
         peeks.push(peek);
       } else {
         peeks.push(fillSlotAt(peek, spot, currentTimeMs));
-        workingState = { peeks };
+        workingState = rememberSpot({ ...workingState, peeks }, spot);
       }
       continue;
     }
@@ -465,7 +520,7 @@ export function attemptClaim(
   );
   return {
     matchState: addScore(matchState, playerIndex, NORMAL_CHICK_POINTS),
-    peekState: { peeks: newPeeks },
+    peekState: rememberSpot({ ...peekState, peeks: newPeeks }, spotIndex),
     claimed: true,
   };
 }

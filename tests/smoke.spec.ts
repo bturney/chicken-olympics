@@ -263,18 +263,20 @@ function probeProductionMatchDefaults(
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return null;
     const match = scene as unknown as {
-      matchState: {
-        durationMs: number;
-        elapsedMs: number;
-        scores: [number, number];
+      match: {
+        matchState: {
+          durationMs: number;
+          elapsedMs: number;
+          scores: [number, number];
+        };
       };
       timerText: { text: string };
     };
     return {
-      durationMs: match.matchState.durationMs,
-      elapsedMs: match.matchState.elapsedMs,
+      durationMs: match.match.matchState.durationMs,
+      elapsedMs: match.match.matchState.elapsedMs,
       timerText: match.timerText.text,
-      scores: match.matchState.scores,
+      scores: match.match.matchState.scores,
     };
   });
 }
@@ -323,15 +325,17 @@ async function completeMatchForTest(
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return;
     const match = scene as unknown as {
-      matchState: {
-        durationMs: number;
-        elapsedMs: number;
-        scores: [number, number];
+      match: {
+        matchState: {
+          durationMs: number;
+          elapsedMs: number;
+          scores: [number, number];
+        };
       };
     };
-    match.matchState = {
-      ...match.matchState,
-      elapsedMs: match.matchState.durationMs,
+    match.match.matchState = {
+      ...match.match.matchState,
+      elapsedMs: match.match.matchState.durationMs,
       scores: nextScores,
     };
   }, scores);
@@ -476,11 +480,13 @@ async function movePlayerOntoActiveChick(
           setPosition: (x: number, y: number) => void;
         };
         chickBodies: Array<{ x: number; y: number; visible: boolean }>;
-        peekState: { peeks: Array<{ activeSpotIndex: number | null }> };
+        match: {
+          peekState: { peeks: Array<{ activeSpotIndex: number | null }> };
+        };
       };
       const targetChick = match.chickBodies.find(
         (c, i) =>
-          c.visible && match.peekState.peeks[i]?.activeSpotIndex !== null,
+          c.visible && match.match.peekState.peeks[i]?.activeSpotIndex !== null,
       );
       if (!targetChick) return;
       const player = playerIndex === 0 ? match.p1Chicken : match.p2Chicken;
@@ -524,7 +530,7 @@ function probeClaimFeedback(
         scaleY: number;
         visible: boolean;
       }>;
-      matchState: { scores: [number, number]; elapsedMs: number };
+      match: { matchState: { scores: [number, number]; elapsedMs: number } };
       p1ScoreText: { text: string };
       p2ScoreText: { text: string };
       claimAnimationState: {
@@ -542,11 +548,11 @@ function probeClaimFeedback(
         scaleY: b.scaleY,
         visible: b.visible,
       })),
-      scores: match.matchState.scores,
+      scores: match.match.matchState.scores,
       p1ScoreText: match.p1ScoreText.text,
       p2ScoreText: match.p2ScoreText.text,
       activeClaimAnimationCount: match.claimAnimationState.animations.length,
-      elapsedMs: match.matchState.elapsedMs,
+      elapsedMs: match.match.matchState.elapsedMs,
       animationDetails: match.claimAnimationState.animations.map((a) => ({
         slotIndex: a.slotIndex,
         playerIndex: a.playerIndex,
@@ -677,24 +683,26 @@ function probeGreenChick(
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return null;
     const match = scene as unknown as {
-      greenChickState: {
-        status: string;
-        scheduledAtMs: number;
-        activeSpotIndex: number | null;
-        peekStartedAtMs: number | null;
+      match: {
+        greenChickState: {
+          status: string;
+          scheduledAtMs: number;
+          activeSpotIndex: number | null;
+          peekStartedAtMs: number | null;
+        };
+        matchState: { scores: [number, number]; elapsedMs: number };
       };
       greenChickBody: { x: number; y: number; visible: boolean };
-      matchState: { scores: [number, number]; elapsedMs: number };
       p1ScoreText: { text: string };
       p2ScoreText: { text: string };
     };
     return {
-      greenChickState: match.greenChickState,
+      greenChickState: match.match.greenChickState,
       greenChickBody: match.greenChickBody,
-      scores: match.matchState.scores,
+      scores: match.match.matchState.scores,
       p1ScoreText: match.p1ScoreText.text,
       p2ScoreText: match.p2ScoreText.text,
-      elapsedMs: match.matchState.elapsedMs,
+      elapsedMs: match.match.matchState.elapsedMs,
     };
   });
 }
@@ -708,15 +716,17 @@ async function activateGreenChickForTest(
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return;
     const match = scene as unknown as {
-      greenChickState: {
-        status: string;
-        scheduledAtMs: number;
-        activeSpotIndex: number | null;
-        peekStartedAtMs: number | null;
-        claimedAtMs: number | null;
-        claimedByPlayerIndex: 0 | 1 | null;
+      match: {
+        greenChickState: {
+          status: string;
+          scheduledAtMs: number;
+          activeSpotIndex: number | null;
+          peekStartedAtMs: number | null;
+          claimedAtMs: number | null;
+          claimedByPlayerIndex: 0 | 1 | null;
+        };
+        matchState: { elapsedMs: number };
       };
-      matchState: { elapsedMs: number };
       greenChickBody: {
         x: number;
         y: number;
@@ -725,11 +735,11 @@ async function activateGreenChickForTest(
         setVisible: (v: boolean) => void;
       };
     };
-    match.greenChickState = {
+    match.match.greenChickState = {
       status: "active",
       scheduledAtMs: 0,
       activeSpotIndex: 5,
-      peekStartedAtMs: match.matchState.elapsedMs,
+      peekStartedAtMs: match.match.matchState.elapsedMs,
       claimedAtMs: null,
       claimedByPlayerIndex: null,
     };
@@ -863,9 +873,9 @@ test("Green Chick does not return after the match continues past its expiry", as
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return;
     const match = scene as unknown as {
-      matchState: { elapsedMs: number };
+      match: { matchState: { elapsedMs: number } };
     };
-    match.matchState.elapsedMs = targetElapsedMs;
+    match.match.matchState.elapsedMs = targetElapsedMs;
   }, 30_000);
 
   await expect
@@ -935,16 +945,18 @@ async function scheduleGreenChickToAppearNow(
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return;
     const match = scene as unknown as {
-      greenChickState: {
-        status: string;
-        scheduledAtMs: number;
-        activeSpotIndex: number | null;
-        peekStartedAtMs: number | null;
-        claimedAtMs: number | null;
-        claimedByPlayerIndex: 0 | 1 | null;
+      match: {
+        greenChickState: {
+          status: string;
+          scheduledAtMs: number;
+          activeSpotIndex: number | null;
+          peekStartedAtMs: number | null;
+          claimedAtMs: number | null;
+          claimedByPlayerIndex: 0 | 1 | null;
+        };
       };
     };
-    match.greenChickState = {
+    match.match.greenChickState = {
       status: "pending",
       scheduledAtMs: 0,
       activeSpotIndex: null,
@@ -1040,14 +1052,16 @@ async function completeShortMatchForTest(
       const scene = game.scene.getScene("MatchScene");
       if (!scene) return;
       const match = scene as unknown as {
-        matchState: {
-          durationMs: number;
-          elapsedMs: number;
-          scores: [number, number];
+        match: {
+          matchState: {
+            durationMs: number;
+            elapsedMs: number;
+            scores: [number, number];
+          };
         };
       };
-      match.matchState = {
-        ...match.matchState,
+      match.match.matchState = {
+        ...match.match.matchState,
         durationMs,
         elapsedMs: durationMs,
         scores: nextScores,

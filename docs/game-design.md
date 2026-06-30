@@ -91,7 +91,31 @@ When time runs out, show a podium ceremony.
 - The match ends after 90 seconds.
 - The podium ceremony correctly shows the winner or tie.
 
-## Version 2 Ideas
+## Version 2 Direction
+
+- Feel and pacing pass over the existing 2-player local match.
+- Celebratory claim beats that feel cute first and mildly competitive second.
+- Silly-triumphant normal claim animation and a small set of gentle chirp/pop sound variants without crowd-cheer fatigue.
+- Default normal claim visual: express a hop-spin-poof using the current abstract-shape language through motion, rotation, scale, color, and small particles.
+- Visual scope: stay in the abstract-shape language for v2 by default; allow basic sprites only if they are low-effort and do not become a dependency for proving feel.
+- Light abstract shape-identity pass so peeking chicks, claimed chicks, player chickens, and hiding spots are distinct enough for claim beats to read clearly.
+- Green chick claim beat that feels about three times more special than a normal claim, including crowd cheer, without pausing the match.
+- Keep green chick rules presentation-first for v2: once per match and +5 points remain the baseline unless playtesting shows the softer peek pressure makes it too easy or too swingy.
+- Podium ceremony can get a small end-cap after the core v2 slices, such as winner bounce, gentle fanfare, and crowd cheer, without redesigning the ceremony flow.
+- Subtle mostly-visual peek anticipation from hiding spots before chicks peek.
+- Lightweight chicken cursor personality such as bobbing or squash without changing movement rules.
+- Softer peek pressure: up to three normal chicks visible at once instead of constantly maintaining exactly three.
+- Tune normal chick pacing toward usually two visible chicks, sometimes one, and occasional three-chick spikes.
+- Initial normal-chick visibility target for playtesting: one chick 30% of the time, two chicks 50%, three chicks 20%, and almost no empty-board time.
+- Start circuit-breaking with selection memory that avoids refilling the same hiding spot or tight local cluster too often.
+- Treat deeper circuit-breaking changes, such as more hiding spots, layout redesign, or movement mechanics, as a separate prototype topic.
+
+First playable v2 slice: normal celebratory claim beats plus claim score echo.
+Second playable v2 slice: peek pressure tuning through up-to-three visibility, refill timing, selection memory, and mostly-visual peek anticipation.
+
+First-slice playtest signal: players can tell who claimed a chick without looking at the scoreboard, and the claiming player gets a small fun reaction from the moment.
+
+## Later Ideas
 
 - Configurable match length for solo, small group, and bigger group play.
 - More than 2 local players.

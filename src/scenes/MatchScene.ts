@@ -70,6 +70,7 @@ export class MatchScene extends Phaser.Scene {
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
   private chickBodies: Phaser.Physics.Arcade.Sprite[] = [];
   private greenChickBody!: Phaser.Physics.Arcade.Sprite;
+  private peekAnticipationLayer!: Phaser.GameObjects.Graphics;
   private sfxScheduler: SfxScheduler = { schedule: () => {} };
   private sfxNow: () => number = () => 0;
   readonly playedSfx: MatchSfxId[] = [];
@@ -114,6 +115,7 @@ export class MatchScene extends Phaser.Scene {
     this.createPlayers();
     this.createChicks();
     this.createHidingSpots();
+    this.createPeekAnticipationLayer();
     this.createInput();
     this.createOverlaps();
     this.drawBounds();
@@ -131,6 +133,7 @@ export class MatchScene extends Phaser.Scene {
     this.presentationFeedback.tick(this.match.view().elapsedMs);
     this.cleanupClaimScoreEchoes();
     this.renderChicks();
+    this.renderPeekAnticipations();
     this.renderGreenChick();
     this.updateHUD();
 
@@ -496,6 +499,11 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
+  private createPeekAnticipationLayer(): void {
+    this.peekAnticipationLayer = this.add.graphics();
+    this.peekAnticipationLayer.setDepth(8);
+  }
+
   private createInput(): void {
     this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as {
       W: Phaser.Input.Keyboard.Key;
@@ -567,6 +575,29 @@ export class MatchScene extends Phaser.Scene {
         body.body!.enable = false;
         body.setVisible(false);
       }
+    }
+  }
+
+  private renderPeekAnticipations(): void {
+    const view = this.match.view();
+    this.peekAnticipationLayer.clear();
+
+    for (const anticipation of view.peekAnticipations) {
+      const spot = FARMYARD_LAYOUT.hidingSpots[anticipation.spotIndex];
+      if (!spot) continue;
+
+      const wobble = Math.sin((view.elapsedMs - anticipation.startedAtMs) / 60) * 2;
+      const radius = 16 * WORLD_SCALE + wobble;
+
+      this.peekAnticipationLayer.lineStyle(2, 0xfff2a0, 0.45);
+      this.peekAnticipationLayer.strokeCircle(spot.x, spot.y, radius);
+      this.peekAnticipationLayer.fillStyle(0xffffff, 0.08);
+      this.peekAnticipationLayer.fillCircle(spot.x, spot.y, radius - 4);
+      this.peekAnticipationLayer.lineStyle(1, 0xffffff, 0.25);
+      this.peekAnticipationLayer.beginPath();
+      this.peekAnticipationLayer.moveTo(spot.x - radius, spot.y);
+      this.peekAnticipationLayer.lineTo(spot.x + radius, spot.y);
+      this.peekAnticipationLayer.strokePath();
     }
   }
 

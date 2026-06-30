@@ -56,6 +56,7 @@ export const NORMAL_PEEK_COUNT = 3;
 export const NORMAL_PEEK_DURATION_MS = 5_000;
 export const NORMAL_REFILL_MIN_MS = 500;
 export const NORMAL_REFILL_MAX_MS = 1_500;
+export const PEEK_ANTICIPATION_DURATION_MS = 250;
 export const NORMAL_CHICK_POINTS = 1;
 
 export const GREEN_CHICK_POINTS = 5;
@@ -105,7 +106,7 @@ function selectFreeSpotForGreenChick(
   randomValue: number,
 ): number | null {
   const occupied = new Set(
-    getActiveNormalSpotIndices(peekState, currentTimeMs),
+    getReservedNormalSpotIndices(peekState, currentTimeMs),
   );
   if (greenChickState.activeSpotIndex !== null) {
     occupied.add(greenChickState.activeSpotIndex);
@@ -241,6 +242,8 @@ export interface NormalPeek {
   activeSpotIndex: number | null;
   peekStartedAtMs: number | null;
   nextRefillAtMs: number | null;
+  anticipationStartedAtMs: number | null;
+  anticipatedSpotIndex: number | null;
 }
 
 export interface PeekState {
@@ -256,6 +259,8 @@ export function createPeekState(now: number = 0): PeekState {
       activeSpotIndex: null,
       peekStartedAtMs: null,
       nextRefillAtMs: now,
+      anticipationStartedAtMs: null,
+      anticipatedSpotIndex: null,
     })),
     recentSpotIndices: [],
   };
@@ -269,6 +274,15 @@ function rememberSpot(peekState: PeekState, spotIndex: number): PeekState {
       ...peekState.recentSpotIndices.filter((recent) => recent !== spotIndex),
     ].slice(0, RECENT_SPOT_MEMORY),
   };
+}
+
+function isPeekAnticipating(peek: NormalPeek, currentTimeMs: number): boolean {
+  return (
+    peek.anticipatedSpotIndex !== null &&
+    peek.anticipationStartedAtMs !== null &&
+    peek.peekStartedAtMs !== null &&
+    currentTimeMs < peek.peekStartedAtMs
+  );
 }
 
 export function isPeekActive(peek: NormalPeek, currentTimeMs: number): boolean {
@@ -291,6 +305,19 @@ export function getActiveNormalSpotIndices(
   return out;
 }
 
+function getReservedNormalSpotIndices(
+  peekState: PeekState,
+  currentTimeMs: number,
+): readonly number[] {
+  const out = new Set(getActiveNormalSpotIndices(peekState, currentTimeMs));
+  for (const peek of peekState.peeks) {
+    if (isPeekAnticipating(peek, currentTimeMs) && peek.anticipatedSpotIndex !== null) {
+      out.add(peek.anticipatedSpotIndex);
+    }
+  }
+  return [...out];
+}
+
 export function computeRefillDelayMs(randomValue: number): number {
   const clamped = Math.max(0, Math.min(1, randomValue));
   return (
@@ -305,7 +332,7 @@ export function selectFreeSpotIndex(
   spotCount: number,
   randomValue: number,
 ): number | null {
-  const active = new Set(getActiveNormalSpotIndices(peekState, currentTimeMs));
+  const active = new Set(getReservedNormalSpotIndices(peekState, currentTimeMs));
   const free: number[] = [];
   for (let i = 0; i < spotCount; i++) {
     if (!active.has(i)) free.push(i);
@@ -363,7 +390,34 @@ function fillSlotAt(
     activeSpotIndex: spotIndex,
     peekStartedAtMs: currentTimeMs,
     nextRefillAtMs: null,
+    anticipationStartedAtMs: null,
+    anticipatedSpotIndex: null,
   };
+}
+
+function startAnticipation(
+  peek: NormalPeek,
+  spotIndex: number,
+  currentTimeMs: number,
+  activationTimeMs: number,
+): NormalPeek {
+  return {
+    activeSpotIndex: null,
+    peekStartedAtMs: activationTimeMs,
+    nextRefillAtMs: null,
+    anticipationStartedAtMs: currentTimeMs,
+    anticipatedSpotIndex: spotIndex,
+  };
+}
+
+function activateAnticipation(
+  peek: NormalPeek,
+  currentTimeMs: number,
+): NormalPeek {
+  if (peek.anticipatedSpotIndex === null) {
+    return peek;
+  }
+  return fillSlotAt(peek, peek.anticipatedSpotIndex, currentTimeMs);
 }
 
 function expireSlot(
@@ -375,6 +429,8 @@ function expireSlot(
     activeSpotIndex: null,
     peekStartedAtMs: null,
     nextRefillAtMs: currentTimeMs + computeRefillDelayMs(random()),
+    anticipationStartedAtMs: null,
+    anticipatedSpotIndex: null,
   };
 }
 
@@ -397,7 +453,28 @@ export function tickPeekState(
       }
       continue;
     }
-    if (peek.nextRefillAtMs !== null && currentTimeMs >= peek.nextRefillAtMs) {
+
+    if (
+      peek.anticipatedSpotIndex !== null &&
+      peek.anticipationStartedAtMs !== null &&
+      peek.peekStartedAtMs !== null
+    ) {
+      if (currentTimeMs >= peek.peekStartedAtMs) {
+        const activated = activateAnticipation(peek, currentTimeMs);
+        peeks.push(activated);
+        if (activated.activeSpotIndex !== null) {
+          workingState = rememberSpot({ ...workingState, peeks }, activated.activeSpotIndex);
+        }
+      } else {
+        peeks.push(peek);
+      }
+      continue;
+    }
+
+    if (
+      peek.nextRefillAtMs !== null &&
+      currentTimeMs >= peek.nextRefillAtMs - PEEK_ANTICIPATION_DURATION_MS
+    ) {
       const spot = selectFreeSpotIndex(
         workingState,
         currentTimeMs,
@@ -407,14 +484,57 @@ export function tickPeekState(
       if (spot === null) {
         peeks.push(peek);
       } else {
-        peeks.push(fillSlotAt(peek, spot, currentTimeMs));
-        workingState = rememberSpot({ ...workingState, peeks }, spot);
+        const anticipationStartedAtMs = currentTimeMs;
+        const anticipated = startAnticipation(
+          peek,
+          spot,
+          anticipationStartedAtMs,
+          peek.nextRefillAtMs,
+        );
+        if (currentTimeMs >= anticipated.peekStartedAtMs!) {
+          const activated = activateAnticipation(anticipated, currentTimeMs);
+          peeks.push(activated);
+          workingState = rememberSpot({ ...workingState, peeks }, spot);
+        } else {
+          peeks.push(anticipated);
+          workingState = { ...workingState, peeks };
+        }
       }
       continue;
     }
     peeks.push(peek);
   }
   return workingState;
+}
+
+export interface PeekAnticipation {
+  slotIndex: number;
+  spotIndex: number;
+  startedAtMs: number;
+}
+
+export function getActivePeekAnticipations(
+  peekState: PeekState,
+  currentTimeMs: number,
+): PeekAnticipation[] {
+  return peekState.peeks.flatMap((peek, slotIndex) => {
+    if (!isPeekAnticipating(peek, currentTimeMs)) {
+      return [];
+    }
+    if (
+      peek.anticipatedSpotIndex === null ||
+      peek.anticipationStartedAtMs === null
+    ) {
+      return [];
+    }
+    return [
+      {
+        slotIndex,
+        spotIndex: peek.anticipatedSpotIndex,
+        startedAtMs: peek.anticipationStartedAtMs,
+      },
+    ];
+  });
 }
 
 export interface ClaimResult {

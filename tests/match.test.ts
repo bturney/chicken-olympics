@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Match } from "../src/match/match";
+import {
+  NORMAL_REFILL_MIN_MS,
+  PEEK_ANTICIPATION_DURATION_MS,
+} from "../src/match/rules";
 
 describe("Match", () => {
   function constantRandom(value: number): () => number {
@@ -49,6 +53,35 @@ describe("Match", () => {
     const normalChicks = match.view().normalChicks;
     expect(normalChicks).toHaveLength(3);
     expect(new Set(normalChicks.map((chick) => chick.spotIndex)).size).toBe(3);
+  });
+
+  it("exposes a brief Peek Anticipation before refilling normal chicks", () => {
+    const match = new Match({
+      durationMs: 10_000,
+      spotCount: 6,
+      random: constantRandom(0),
+    });
+
+    match.advance(0);
+    match.advance(5_000);
+
+    expect(match.view().normalChicks).toHaveLength(0);
+    expect(match.view().peekAnticipations).toHaveLength(0);
+
+    match.advance(PEEK_ANTICIPATION_DURATION_MS);
+
+    const cueView = match.view();
+    expect(cueView.peekAnticipations).toHaveLength(3);
+    expect(new Set(cueView.peekAnticipations.map((cue) => cue.spotIndex)).size).toBe(
+      3,
+    );
+    expect(cueView.normalChicks).toHaveLength(0);
+
+    match.advance(NORMAL_REFILL_MIN_MS - PEEK_ANTICIPATION_DURATION_MS);
+
+    const refilledView = match.view();
+    expect(refilledView.peekAnticipations).toHaveLength(0);
+    expect(refilledView.normalChicks).toHaveLength(3);
   });
 
   it("lets a player claim a visible normal chick for one point", () => {

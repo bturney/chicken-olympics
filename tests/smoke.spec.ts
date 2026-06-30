@@ -142,7 +142,12 @@ function getMatchTexturePixel(
       const ctx = source.getContext("2d");
       if (!ctx) return null;
       const pixel = ctx.getImageData(x, y, 1, 1).data;
-      return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0, a: pixel[3] ?? 0 };
+      return {
+        r: pixel[0] ?? 0,
+        g: pixel[1] ?? 0,
+        b: pixel[2] ?? 0,
+        a: pixel[3] ?? 0,
+      };
     },
     { key: textureKey, x, y },
   );
@@ -400,6 +405,12 @@ interface PodiumProbe {
   p1ScoreTextColor: string;
   p2ScoreTextColor: string;
   resultText: string;
+  titleScaleX: number;
+  titleScaleY: number;
+  player1ScaleX: number;
+  player1ScaleY: number;
+  player2ScaleX: number;
+  player2ScaleY: number;
   chickenTextureKeys: string[];
 }
 
@@ -418,6 +429,8 @@ function probePodium(
           text?: string;
           style?: { color?: string };
           texture?: { key: string };
+          scaleX?: number;
+          scaleY?: number;
         }>;
       };
     };
@@ -432,12 +445,25 @@ function probePodium(
         t.text === "Player 2 Wins!" ||
         t.text === "It's a Tie!",
     );
+    const titleText = texts.find((t) => t.text === "Podium Ceremony");
+    const podiumP1 = images.find((i) =>
+      i.texture?.key?.startsWith("podium_p1_"),
+    );
+    const podiumP2 = images.find((i) =>
+      i.texture?.key?.startsWith("podium_p2_"),
+    );
     return {
       p1ScoreText: scoreP1?.text ?? "",
       p2ScoreText: scoreP2?.text ?? "",
       p1ScoreTextColor: scoreP1?.style?.color ?? "",
       p2ScoreTextColor: scoreP2?.style?.color ?? "",
       resultText: resultText?.text ?? "",
+      titleScaleX: titleText?.scaleX ?? 0,
+      titleScaleY: titleText?.scaleY ?? 0,
+      player1ScaleX: podiumP1?.scaleX ?? 0,
+      player1ScaleY: podiumP1?.scaleY ?? 0,
+      player2ScaleX: podiumP2?.scaleX ?? 0,
+      player2ScaleY: podiumP2?.scaleY ?? 0,
       chickenTextureKeys: images
         .map((i) => i.texture?.key)
         .filter((k): k is string => typeof k === "string"),
@@ -633,7 +659,8 @@ function probeClaimFeedback(
       p1ScoreScaleY: match.p1ScoreText.scaleY,
       p2ScoreScaleX: match.p2ScoreText.scaleX,
       p2ScoreScaleY: match.p2ScoreText.scaleY,
-      activeClaimAnimationCount: match.presentationFeedback.claimAnimations.length,
+      activeClaimAnimationCount:
+        match.presentationFeedback.claimAnimations.length,
       elapsedMs: match.matchState.elapsedMs,
       animationDetails: match.presentationFeedback.claimAnimations.map((a) => ({
         slotIndex: a.slotIndex,
@@ -1140,6 +1167,45 @@ test("Podium Ceremony queues a celebratory SFX fanfare on entry", async ({
     .toMatchObject({
       podium: expect.arrayContaining(["podiumFanfare"]),
     });
+});
+
+test("Podium Ceremony gives the gold podium chicken and title a small celebratory pop", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await completeMatchForTest(page, [3, 1]);
+
+  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
+
+  await expect
+    .poll(() => probePodium(page), { timeout: 2_000, intervals: [16, 32, 64] })
+    .toMatchObject({
+      titleScaleX: expect.any(Number),
+      player1ScaleX: expect.any(Number),
+    });
+
+  const podium = await probePodium(page);
+  expect(podium).not.toBeNull();
+  expect(podium!.titleScaleX).toBeGreaterThan(1);
+  expect(podium!.titleScaleY).toBeGreaterThan(1);
+  expect(podium!.player1ScaleX).toBeGreaterThan(1);
+  expect(podium!.player1ScaleY).toBeGreaterThan(1);
+  expect(podium!.player2ScaleX).toBe(1);
+  expect(podium!.player2ScaleY).toBe(1);
 });
 
 async function completeShortMatchForTest(

@@ -105,10 +105,11 @@ export class PodiumScene extends Phaser.Scene {
 
     this.drawPodiumBlocks();
     this.drawGround(width, height);
-    this.placePlayers(winner, p1Color, p2Color);
-    this.drawTitle(width);
+    const playerImages = this.placePlayers(winner, p1Color, p2Color);
+    const title = this.drawTitle(width);
     this.drawScores(width, height, p1Score, p2Score, p1Color, p2Color);
-    this.drawResult(width, height, winner);
+    const result = this.drawResult(width, height, winner);
+    this.playCelebrationPop(winner, playerImages, title, result);
     this.drawPlayAgainButton(width, height);
   }
 
@@ -153,6 +154,11 @@ export class PodiumScene extends Phaser.Scene {
     blockWidth: number,
     blockHeight: number,
   ): void {
+    const key = podiumBlockTextureKey(label);
+    if (this.textures.exists(key)) {
+      return;
+    }
+
     const gfx = this.make.graphics({ x: 0, y: 0 }, false);
     const radius = 6 * WORLD_SCALE;
     const topStrip = 8 * WORLD_SCALE;
@@ -167,7 +173,7 @@ export class PodiumScene extends Phaser.Scene {
     });
     gfx.lineStyle(2 * WORLD_SCALE, PODIUM_BLOCK_FRONT, 1);
     gfx.strokeRoundedRect(0, 0, blockWidth, blockHeight, radius);
-    gfx.generateTexture(podiumBlockTextureKey(label), blockWidth, blockHeight);
+    gfx.generateTexture(key, blockWidth, blockHeight);
     gfx.destroy();
   }
 
@@ -187,79 +193,81 @@ export class PodiumScene extends Phaser.Scene {
     winner: 0 | 1 | null,
     p1Color: PlayerChickenColor,
     p2Color: PlayerChickenColor,
-  ): void {
+  ): [Phaser.GameObjects.Image, Phaser.GameObjects.Image] {
     this.createPlayerTexture(1, p1Color);
     this.createPlayerTexture(2, p2Color);
 
     if (winner === null) {
       const goldTopY = GOLD_BLOCK.y;
-      this.add
+      const p1 = this.add
         .image(
           GOLD_BLOCK.x - 24 * WORLD_SCALE,
           goldTopY - PLAYER_RADIUS,
           podiumTextureKey(1, p1Color),
         )
         .setOrigin(0.5, 1);
-      this.add
+      const p2 = this.add
         .image(
           GOLD_BLOCK.x + 24 * WORLD_SCALE,
           goldTopY - PLAYER_RADIUS,
           podiumTextureKey(2, p2Color),
         )
         .setOrigin(0.5, 1);
-      return;
+      return [p1, p2];
     }
 
     if (winner === 0) {
-      this.add
+      const p1 = this.add
         .image(
           GOLD_BLOCK.x,
           GOLD_BLOCK.y - PLAYER_RADIUS,
           podiumTextureKey(1, p1Color),
         )
         .setOrigin(0.5, 1);
-      this.add
+      const p2 = this.add
         .image(
           SILVER_BLOCK.x,
           SILVER_BLOCK.y - PLAYER_RADIUS,
           podiumTextureKey(2, p2Color),
         )
         .setOrigin(0.5, 1);
-      return;
+      return [p1, p2];
     }
 
-    this.add
+    const p1 = this.add
       .image(
         SILVER_BLOCK.x,
         SILVER_BLOCK.y - PLAYER_RADIUS,
         podiumTextureKey(1, p1Color),
       )
       .setOrigin(0.5, 1);
-    this.add
+    const p2 = this.add
       .image(
         GOLD_BLOCK.x,
         GOLD_BLOCK.y - PLAYER_RADIUS,
         podiumTextureKey(2, p2Color),
       )
       .setOrigin(0.5, 1);
+    return [p1, p2];
   }
 
   private createPlayerTexture(player: 1 | 2, color: PlayerChickenColor): void {
+    const key = podiumTextureKey(player, color);
+    if (this.textures.exists(key)) {
+      return;
+    }
+
     const gfx = this.make.graphics({ x: 0, y: 0 }, false);
     gfx.fillStyle(getPlayerChickenHex(color), 1);
     gfx.fillCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
     gfx.lineStyle(2 * WORLD_SCALE, 0x222222, 1);
     gfx.strokeCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
-    gfx.generateTexture(
-      podiumTextureKey(player, color),
-      PLAYER_RADIUS * 2,
-      PLAYER_RADIUS * 2,
-    );
+    gfx.generateTexture(key, PLAYER_RADIUS * 2, PLAYER_RADIUS * 2);
     gfx.destroy();
   }
 
-  private drawTitle(width: number): void {
-    this.add
+  private drawTitle(width: number): Phaser.GameObjects.Text {
+    return this.add
       .text(width / 2, 60 * WORLD_SCALE, "Podium Ceremony", {
         fontSize: `${32 * WORLD_SCALE}px`,
         color: "#ffd700",
@@ -304,7 +312,7 @@ export class PodiumScene extends Phaser.Scene {
     width: number,
     height: number,
     winner: 0 | 1 | null,
-  ): void {
+  ): Phaser.GameObjects.Text {
     let result: string;
     if (winner === 0) {
       result = "Player 1 Wins!";
@@ -314,12 +322,47 @@ export class PodiumScene extends Phaser.Scene {
       result = "It's a Tie!";
     }
 
-    this.add
+    return this.add
       .text(width / 2, height - 60 * WORLD_SCALE, result, {
         fontSize: `${26 * WORLD_SCALE}px`,
         color: "#ffffff",
       })
       .setOrigin(0.5);
+  }
+
+  private playCelebrationPop(
+    winner: 0 | 1 | null,
+    playerImages: [Phaser.GameObjects.Image, Phaser.GameObjects.Image],
+    title: Phaser.GameObjects.Text,
+    result: Phaser.GameObjects.Text,
+  ): void {
+    this.popIn(title, 1.08, 220, 0);
+    this.popIn(result, 1.04, 220, 40);
+
+    if (winner === null) {
+      this.popIn(playerImages[0], 1.12, 260, 0);
+      this.popIn(playerImages[1], 1.12, 260, 0);
+      return;
+    }
+
+    this.popIn(playerImages[winner], 1.12, 260, 0);
+  }
+
+  private popIn(
+    target: Phaser.GameObjects.Image | Phaser.GameObjects.Text,
+    startScale: number,
+    duration: number,
+    delay: number,
+  ): void {
+    target.setScale(startScale);
+    this.tweens.add({
+      targets: target,
+      scaleX: 1,
+      scaleY: 1,
+      duration,
+      delay,
+      ease: "Quad.Out",
+    });
   }
 
   private drawPlayAgainButton(width: number, height: number): void {

@@ -1,11 +1,6 @@
 import Phaser from "phaser";
 import {
-  createClaimAnimationState,
-  startClaimAnimation,
-  getActiveClaimAnimation,
-  tickClaimAnimations,
   computeClaimPopScale,
-  type ClaimAnimationState,
   NORMAL_PEEK_COUNT,
 } from "../match/rules";
 import { Match, type MatchEvent } from "../match/match";
@@ -25,6 +20,7 @@ import {
   type SfxMoment,
 } from "../audio/sfx";
 import { createWebAudioScheduler } from "../audio/web-audio";
+import { MatchPresentationFeedback } from "./MatchPresentationFeedback";
 
 export type MatchSfxId = "normalClaim" | "greenChickAppear" | "greenChickClaim";
 
@@ -55,7 +51,7 @@ function hexToCssHex(value: number): string {
 
 export class MatchScene extends Phaser.Scene {
   private match!: Match;
-  private claimAnimationState!: ClaimAnimationState;
+  presentationFeedback!: MatchPresentationFeedback;
   private timerText!: Phaser.GameObjects.Text;
   private p1ScoreText!: Phaser.GameObjects.Text;
   private p2ScoreText!: Phaser.GameObjects.Text;
@@ -96,7 +92,7 @@ export class MatchScene extends Phaser.Scene {
       spotCount: FARMYARD_LAYOUT.hidingSpots.length,
       random: () => Math.random(),
     });
-    this.claimAnimationState = createClaimAnimationState();
+    this.presentationFeedback = new MatchPresentationFeedback();
     this.transitioned = false;
     this.chickBodies = [];
     this.initAudio();
@@ -126,10 +122,7 @@ export class MatchScene extends Phaser.Scene {
 
     this.handleMovement();
     this.handleMatchEvents(this.match.advance(delta));
-    this.claimAnimationState = tickClaimAnimations(
-      this.claimAnimationState,
-      this.match.view().elapsedMs,
-    );
+    this.presentationFeedback.tick(this.match.view().elapsedMs);
     this.renderChicks();
     this.renderGreenChick();
     this.updateHUD();
@@ -166,8 +159,7 @@ export class MatchScene extends Phaser.Scene {
     for (const event of events) {
       switch (event.type) {
         case "normalChickClaimed":
-          this.claimAnimationState = startClaimAnimation(
-            this.claimAnimationState,
+          this.presentationFeedback.startClaimAnimation(
             event.slotIndex,
             event.spotIndex,
             event.playerIndex,
@@ -467,8 +459,7 @@ export class MatchScene extends Phaser.Scene {
       const visibleChick = view.normalChicks.find(
         (chick) => chick.slotIndex === slotIndex,
       );
-      const claimAnimation = getActiveClaimAnimation(
-        this.claimAnimationState,
+      const claimAnimation = this.presentationFeedback.getActiveClaimAnimation(
         slotIndex,
         view.elapsedMs,
       );

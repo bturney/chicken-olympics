@@ -527,8 +527,8 @@ function probeClaimFeedback(
       matchState: { scores: [number, number]; elapsedMs: number };
       p1ScoreText: { text: string };
       p2ScoreText: { text: string };
-      claimAnimationState: {
-        animations: Array<{
+      presentationFeedback: {
+        claimAnimations: Array<{
           slotIndex: number;
           playerIndex: number;
           startedAtMs: number;
@@ -545,9 +545,9 @@ function probeClaimFeedback(
       scores: match.matchState.scores,
       p1ScoreText: match.p1ScoreText.text,
       p2ScoreText: match.p2ScoreText.text,
-      activeClaimAnimationCount: match.claimAnimationState.animations.length,
+      activeClaimAnimationCount: match.presentationFeedback.claimAnimations.length,
       elapsedMs: match.matchState.elapsedMs,
-      animationDetails: match.claimAnimationState.animations.map((a) => ({
+      animationDetails: match.presentationFeedback.claimAnimations.map((a) => ({
         slotIndex: a.slotIndex,
         playerIndex: a.playerIndex,
         startedAtMs: a.startedAtMs,

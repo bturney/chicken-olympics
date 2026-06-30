@@ -699,7 +699,13 @@ interface GreenChickProbe {
     activeSpotIndex: number | null;
     peekStartedAtMs: number | null;
   };
-  greenChickBody: { x: number; y: number; visible: boolean };
+  greenChickBody: {
+    x: number;
+    y: number;
+    visible: boolean;
+    scaleX: number;
+    scaleY: number;
+  };
   scores: [number, number];
   p1ScoreText: string;
   p2ScoreText: string;
@@ -721,7 +727,13 @@ function probeGreenChick(
         activeSpotIndex: number | null;
         peekStartedAtMs: number | null;
       };
-      greenChickBody: { x: number; y: number; visible: boolean };
+      greenChickBody: {
+        x: number;
+        y: number;
+        visible: boolean;
+        scaleX: number;
+        scaleY: number;
+      };
       matchState: { scores: [number, number]; elapsedMs: number };
       p1ScoreText: { text: string };
       p2ScoreText: { text: string };
@@ -852,7 +864,14 @@ test("Green Chick renders as an extra peek and awards five points when claimed",
       scores: [5, 0],
       p1ScoreText: "P1 (Blue): 5",
       greenChickState: { status: "claimed" },
+      greenChickBody: {
+        visible: true,
+      },
     });
+
+  const afterClaim = await probeGreenChick(page);
+  expect(afterClaim?.greenChickBody.scaleX).toBeGreaterThan(1.4);
+  expect(afterClaim?.greenChickBody.scaleY).toBeGreaterThan(1.4);
 });
 
 test("Green Chick does not return after the match continues past its expiry", async ({

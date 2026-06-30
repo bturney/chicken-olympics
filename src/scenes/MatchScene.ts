@@ -46,6 +46,15 @@ interface ClaimScoreEcho {
   text: Phaser.GameObjects.Text;
 }
 
+interface GreenClaimBeat {
+  spotIndex: number;
+  playerIndex: 0 | 1;
+  startedAtMs: number;
+}
+
+const GREEN_CLAIM_BEAT_DURATION_MS = 520;
+const GREEN_CLAIM_BEAT_PEAK_SCALE = 1.8;
+
 function playerTextureKey(player: 1 | 2, color: PlayerChickenColor): string {
   return `p${player}_chicken_${color}`;
 }
@@ -71,10 +80,12 @@ export class MatchScene extends Phaser.Scene {
   private chickBodies: Phaser.Physics.Arcade.Sprite[] = [];
   private greenChickBody!: Phaser.Physics.Arcade.Sprite;
   private peekAnticipationLayer!: Phaser.GameObjects.Graphics;
+  private greenClaimBurstLayer!: Phaser.GameObjects.Graphics;
   private sfxScheduler: SfxScheduler = { schedule: () => {} };
   private sfxNow: () => number = () => 0;
   readonly playedSfx: MatchSfxId[] = [];
   readonly claimScoreEchoes: ClaimScoreEcho[] = [];
+  private greenClaimBeat: GreenClaimBeat | null = null;
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -116,6 +127,7 @@ export class MatchScene extends Phaser.Scene {
     this.createChicks();
     this.createHidingSpots();
     this.createPeekAnticipationLayer();
+    this.createGreenClaimBurstLayer();
     this.createInput();
     this.createOverlaps();
     this.drawBounds();
@@ -131,6 +143,7 @@ export class MatchScene extends Phaser.Scene {
     this.handleMovement();
     this.handleMatchEvents(this.match.advance(delta));
     this.presentationFeedback.tick(this.match.view().elapsedMs);
+    this.tickGreenClaimBeat();
     this.cleanupClaimScoreEchoes();
     this.renderChicks();
     this.renderPeekAnticipations();
@@ -187,6 +200,11 @@ export class MatchScene extends Phaser.Scene {
           this.playSfx("greenChickAppear");
           break;
         case "greenChickClaimed":
+          this.startGreenClaimBeat(
+            event.spotIndex,
+            event.playerIndex,
+            this.match.view().elapsedMs,
+          );
           this.playSfx("greenChickClaim");
           break;
         case "greenChickMissed":
@@ -504,6 +522,11 @@ export class MatchScene extends Phaser.Scene {
     this.peekAnticipationLayer.setDepth(8);
   }
 
+  private createGreenClaimBurstLayer(): void {
+    this.greenClaimBurstLayer = this.add.graphics();
+    this.greenClaimBurstLayer.setDepth(9);
+  }
+
   private createInput(): void {
     this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as {
       W: Phaser.Input.Keyboard.Key;
@@ -602,7 +625,27 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private renderGreenChick(): void {
-    const activeSpot = this.match.view().greenChick?.spotIndex ?? null;
+    const view = this.match.view();
+    const greenClaimBeat = this.greenClaimBeat;
+
+    if (greenClaimBeat !== null) {
+      const spot = FARMYARD_LAYOUT.hidingSpots[greenClaimBeat.spotIndex] ?? null;
+      if (!spot) return;
+
+      const scale = this.computeGreenClaimBeatScale(
+        greenClaimBeat.startedAtMs,
+        view.elapsedMs,
+      );
+      this.greenChickBody.setPosition(spot.x, spot.y);
+      this.greenChickBody.setTint(this.getPlayerColor(greenClaimBeat.playerIndex));
+      this.greenChickBody.setScale(scale);
+      this.greenChickBody.body!.enable = false;
+      this.greenChickBody.setVisible(true);
+      this.renderGreenClaimBurst(spot.x, spot.y, scale, view.elapsedMs);
+      return;
+    }
+
+    const activeSpot = view.greenChick?.spotIndex ?? null;
 
     if (activeSpot === null) {
       if (this.greenChickBody.visible) {
@@ -620,6 +663,61 @@ export class MatchScene extends Phaser.Scene {
     this.greenChickBody.setScale(1);
     this.greenChickBody.body!.enable = true;
     this.greenChickBody.setVisible(true);
+  }
+
+  private startGreenClaimBeat(
+    spotIndex: number,
+    playerIndex: 0 | 1,
+    now: number,
+  ): void {
+    this.greenClaimBeat = { spotIndex, playerIndex, startedAtMs: now };
+  }
+
+  private tickGreenClaimBeat(): void {
+    const beat = this.greenClaimBeat;
+    if (beat === null) return;
+
+    if (this.match.view().elapsedMs - beat.startedAtMs >= GREEN_CLAIM_BEAT_DURATION_MS) {
+      this.greenClaimBeat = null;
+      this.greenClaimBurstLayer.clear();
+    }
+  }
+
+  private computeGreenClaimBeatScale(startedAtMs: number, now: number): number {
+    if (now <= startedAtMs) return 1;
+    const elapsed = now - startedAtMs;
+    if (elapsed >= GREEN_CLAIM_BEAT_DURATION_MS) return 0;
+    const progress = elapsed / GREEN_CLAIM_BEAT_DURATION_MS;
+    if (progress < 0.45) {
+      return 1 + (progress / 0.45) * (GREEN_CLAIM_BEAT_PEAK_SCALE - 1);
+    }
+    return GREEN_CLAIM_BEAT_PEAK_SCALE * (1 - (progress - 0.45) / 0.55);
+  }
+
+  private renderGreenClaimBurst(
+    x: number,
+    y: number,
+    scale: number,
+    now: number,
+  ): void {
+    const beat = this.greenClaimBeat;
+    if (beat === null) return;
+
+    const progress = Math.min(
+      1,
+      (now - beat.startedAtMs) / GREEN_CLAIM_BEAT_DURATION_MS,
+    );
+    const burstRadius = 18 * WORLD_SCALE + progress * 26 * WORLD_SCALE;
+    const burstAlpha = 0.45 * (1 - progress);
+    const playerColor = this.getPlayerColor(beat.playerIndex);
+
+    this.greenClaimBurstLayer.clear();
+    this.greenClaimBurstLayer.lineStyle(4, playerColor, burstAlpha);
+    this.greenClaimBurstLayer.strokeCircle(x, y, burstRadius * scale);
+    this.greenClaimBurstLayer.lineStyle(2, 0xffffff, burstAlpha * 0.7);
+    this.greenClaimBurstLayer.strokeCircle(x, y, burstRadius * 0.66 * scale);
+    this.greenClaimBurstLayer.fillStyle(playerColor, burstAlpha * 0.2);
+    this.greenClaimBurstLayer.fillCircle(x, y, burstRadius * 0.42 * scale);
   }
 
   private getPlayerColor(playerIndex: 0 | 1): number {

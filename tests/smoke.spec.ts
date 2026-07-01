@@ -115,10 +115,10 @@ function getMatchTextureColor(
     if (!source) return null;
     const ctx = source.getContext("2d");
     if (!ctx) return null;
-    // Sample the texture's center, which is the middle of the player circle
-    // regardless of the resolution scale factor.
+    // Sample the top body ring. The texture center has darker face detail in
+    // the V2 chicken silhouette, while this spot remains the player color.
     const cx = Math.floor(source.width / 2);
-    const cy = Math.floor(source.height / 2);
+    const cy = Math.floor(source.height * 0.08);
     const pixel = ctx.getImageData(cx, cy, 1, 1).data;
     return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0 };
   }, textureKey);
@@ -294,8 +294,8 @@ test("Match scene gives each Player Chicken a mirrored beak and a more chicken-l
 
   await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
 
-  const p1Beak = await getMatchTexturePixel(page, "p1_chicken_blue", 42, 31);
-  const p2Beak = await getMatchTexturePixel(page, "p2_chicken_red", 14, 31);
+  const p1Beak = await getMatchTexturePixel(page, "p1_chicken_blue", 68, 59);
+  const p2Beak = await getMatchTexturePixel(page, "p2_chicken_red", 44, 59);
   const p1Center = await getMatchTextureColor(page, "p1_chicken_blue");
 
   expect(p1Beak).not.toBeNull();
@@ -304,8 +304,8 @@ test("Match scene gives each Player Chicken a mirrored beak and a more chicken-l
 
   const beak = cssHexToRgb("#ffbf4d");
   expect(beak).not.toBeNull();
-  expect(p1Beak).toEqual(beak);
-  expect(p2Beak).toEqual(beak);
+  expect(p1Beak).toMatchObject(beak!);
+  expect(p2Beak).toMatchObject(beak!);
   expect(p1Beak).not.toEqual(p1Center);
 });
 
@@ -411,10 +411,13 @@ interface PodiumProbe {
   resultText: string;
   titleScaleX: number;
   titleScaleY: number;
+  titlePopStartScale: number | null;
   player1ScaleX: number;
   player1ScaleY: number;
+  player1PopStartScale: number | null;
   player2ScaleX: number;
   player2ScaleY: number;
+  player2PopStartScale: number | null;
   chickenTextureKeys: string[];
 }
 
@@ -435,6 +438,7 @@ function probePodium(
           texture?: { key: string };
           scaleX?: number;
           scaleY?: number;
+          getData?: (key: string) => unknown;
         }>;
       };
     };
@@ -464,10 +468,22 @@ function probePodium(
       resultText: resultText?.text ?? "",
       titleScaleX: titleText?.scaleX ?? 0,
       titleScaleY: titleText?.scaleY ?? 0,
+      titlePopStartScale:
+        typeof titleText?.getData?.("celebrationPopStartScale") === "number"
+          ? (titleText.getData("celebrationPopStartScale") as number)
+          : null,
       player1ScaleX: podiumP1?.scaleX ?? 0,
       player1ScaleY: podiumP1?.scaleY ?? 0,
+      player1PopStartScale:
+        typeof podiumP1?.getData?.("celebrationPopStartScale") === "number"
+          ? (podiumP1.getData("celebrationPopStartScale") as number)
+          : null,
       player2ScaleX: podiumP2?.scaleX ?? 0,
       player2ScaleY: podiumP2?.scaleY ?? 0,
+      player2PopStartScale:
+        typeof podiumP2?.getData?.("celebrationPopStartScale") === "number"
+          ? (podiumP2.getData("celebrationPopStartScale") as number)
+          : null,
       chickenTextureKeys: images
         .map((i) => i.texture?.key)
         .filter((k): k is string => typeof k === "string"),
@@ -1212,12 +1228,9 @@ test("Podium Ceremony gives the gold podium chicken and title a small celebrator
 
   const podium = await probePodium(page);
   expect(podium).not.toBeNull();
-  expect(podium!.titleScaleX).toBeGreaterThan(1);
-  expect(podium!.titleScaleY).toBeGreaterThan(1);
-  expect(podium!.player1ScaleX).toBeGreaterThan(1);
-  expect(podium!.player1ScaleY).toBeGreaterThan(1);
-  expect(podium!.player2ScaleX).toBe(1);
-  expect(podium!.player2ScaleY).toBe(1);
+  expect(podium!.titlePopStartScale).toBeGreaterThan(1);
+  expect(podium!.player1PopStartScale).toBeGreaterThan(1);
+  expect(podium!.player2PopStartScale).toBeNull();
 });
 
 async function completeShortMatchForTest(

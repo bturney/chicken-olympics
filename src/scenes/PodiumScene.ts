@@ -357,6 +357,7 @@ export class PodiumScene extends Phaser.Scene {
     duration: number,
     delay: number,
   ): void {
+    target.setData("celebrationPopStartScale", startScale);
     target.setScale(startScale);
     this.tweens.add({
       targets: target,

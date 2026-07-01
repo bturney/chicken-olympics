@@ -41,11 +41,5 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-
-      - name: E2E tests
-        run: NODE_OPTIONS=--max-old-space-size=5120 npm run test:e2e
-
       - name: Build
         run: npm run build

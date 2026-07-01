@@ -880,50 +880,6 @@ function probeGreenChick(
   });
 }
 
-async function activateGreenChickForTest(
-  page: import("@playwright/test").Page,
-): Promise<void> {
-  await page.evaluate(() => {
-    const game = window.__CHICKEN_OLYMPICS__;
-    if (!game) return;
-    const scene = game.scene.getScene("MatchScene");
-    if (!scene) return;
-    const match = scene as unknown as {
-      match: {
-        greenChickState: {
-          status: string;
-          scheduledAtMs: number;
-          activeSpotIndex: number | null;
-          peekStartedAtMs: number | null;
-          claimedAtMs: number | null;
-          claimedByPlayerIndex: 0 | 1 | null;
-        };
-        matchState: { elapsedMs: number };
-      };
-      greenChickBody: {
-        x: number;
-        y: number;
-        body: { enable: boolean } | null;
-        setPosition: (x: number, y: number) => void;
-        setVisible: (v: boolean) => void;
-      };
-    };
-    match.match.greenChickState = {
-      status: "active",
-      scheduledAtMs: 0,
-      activeSpotIndex: 5,
-      peekStartedAtMs: match.match.matchState.elapsedMs,
-      claimedAtMs: null,
-      claimedByPlayerIndex: null,
-    };
-    match.greenChickBody.setPosition(560, 490);
-    match.greenChickBody.setVisible(true);
-    if (match.greenChickBody.body) {
-      match.greenChickBody.body.enable = true;
-    }
-  });
-}
-
 interface GreenChickClaimRenderProbe extends GreenChickProbe {
   called: boolean;
 }
@@ -1087,26 +1043,11 @@ test("Green Chick does not return after the match continues past its expiry", as
 
   await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
 
-  await activateGreenChickForTest(page);
-
-  await page.waitForTimeout(300);
-
-  await page.evaluate(() => {
-    const game = window.__CHICKEN_OLYMPICS__;
-    if (!game) return;
-    const scene = game.scene.getScene("MatchScene");
-    if (!scene) return;
-    const match = scene as unknown as {
-      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
-    };
-    match.handleGreenChickClaim(0);
+  const beforeAdvance = await claimGreenChickForRenderTest(page);
+  expect(beforeAdvance).toMatchObject({
+    greenChickState: { status: "claimed" },
   });
 
-  await expect
-    .poll(() => probeGreenChick(page), { timeout: 2_000 })
-    .toMatchObject({ greenChickState: { status: "claimed" } });
-
-  const beforeAdvance = await probeGreenChick(page);
   expect(beforeAdvance?.elapsedMs).toBeDefined();
 
   await page.evaluate((targetElapsedMs) => {
@@ -1115,14 +1056,20 @@ test("Green Chick does not return after the match continues past its expiry", as
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return;
     const match = scene as unknown as {
-      match: { matchState: { elapsedMs: number } };
+      match: {
+        matchState: { elapsedMs: number };
+        advance: (deltaMs: number) => unknown;
+      };
+      renderGreenChick: () => void;
     };
     match.match.matchState.elapsedMs = targetElapsedMs;
+    match.match.advance(0);
+    match.renderGreenChick();
   }, 30_000);
 
-  await expect
-    .poll(() => probeGreenChick(page), { timeout: 2_000 })
-    .toMatchObject({ greenChickState: { status: "claimed" } });
+  expect(await probeGreenChick(page)).toMatchObject({
+    greenChickState: { status: "claimed" },
+  });
 });
 
 function probePlayedSfx(page: import("@playwright/test").Page): Promise<{

@@ -6,6 +6,7 @@ import {
   createMatchState,
   getActiveGreenChickSpotIndex,
   getActiveNormalSpotIndices,
+  getActivePeekAnticipations,
   getRemainingMs,
   getWinner,
   isMatchComplete,
@@ -33,6 +34,12 @@ export interface VisibleGreenChick {
   spotIndex: number;
 }
 
+export interface VisiblePeekAnticipation {
+  slotIndex: number;
+  spotIndex: number;
+  startedAtMs: number;
+}
+
 export interface MatchView {
   scores: [number, number];
   elapsedMs: number;
@@ -40,6 +47,7 @@ export interface MatchView {
   complete: boolean;
   winner: 0 | 1 | null;
   normalChicks: VisibleNormalChick[];
+  peekAnticipations: VisiblePeekAnticipation[];
   greenChick: VisibleGreenChick | null;
 }
 
@@ -175,6 +183,7 @@ export class Match {
                 now,
               )!,
             },
+      peekAnticipations: getActivePeekAnticipations(this.peekState, now),
     };
   }
 }

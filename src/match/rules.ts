@@ -1,3 +1,5 @@
+import { FARMYARD_LAYOUT } from "./layout";
+
 export interface MatchOptions {
   durationMs?: number;
 }
@@ -52,8 +54,9 @@ export function getWinner(state: MatchState): 0 | 1 | null {
 
 export const NORMAL_PEEK_COUNT = 3;
 export const NORMAL_PEEK_DURATION_MS = 5_000;
-export const NORMAL_REFILL_MIN_MS = 500;
-export const NORMAL_REFILL_MAX_MS = 1_500;
+export const NORMAL_REFILL_MIN_MS = 900;
+export const NORMAL_REFILL_MAX_MS = 1_900;
+export const PEEK_ANTICIPATION_DURATION_MS = 700;
 export const NORMAL_CHICK_POINTS = 1;
 
 export const GREEN_CHICK_POINTS = 5;
@@ -103,7 +106,7 @@ function selectFreeSpotForGreenChick(
   randomValue: number,
 ): number | null {
   const occupied = new Set(
-    getActiveNormalSpotIndices(peekState, currentTimeMs),
+    getReservedNormalSpotIndices(peekState, currentTimeMs),
   );
   if (greenChickState.activeSpotIndex !== null) {
     occupied.add(greenChickState.activeSpotIndex);
@@ -239,11 +242,16 @@ export interface NormalPeek {
   activeSpotIndex: number | null;
   peekStartedAtMs: number | null;
   nextRefillAtMs: number | null;
+  anticipationStartedAtMs: number | null;
+  anticipatedSpotIndex: number | null;
 }
 
 export interface PeekState {
   peeks: NormalPeek[];
+  recentSpotIndices: number[];
 }
+
+const RECENT_SPOT_MEMORY = 2;
 
 export function createPeekState(now: number = 0): PeekState {
   return {
@@ -251,8 +259,30 @@ export function createPeekState(now: number = 0): PeekState {
       activeSpotIndex: null,
       peekStartedAtMs: null,
       nextRefillAtMs: now,
+      anticipationStartedAtMs: null,
+      anticipatedSpotIndex: null,
     })),
+    recentSpotIndices: [],
   };
+}
+
+function rememberSpot(peekState: PeekState, spotIndex: number): PeekState {
+  return {
+    ...peekState,
+    recentSpotIndices: [
+      spotIndex,
+      ...peekState.recentSpotIndices.filter((recent) => recent !== spotIndex),
+    ].slice(0, RECENT_SPOT_MEMORY),
+  };
+}
+
+function isPeekAnticipating(peek: NormalPeek, currentTimeMs: number): boolean {
+  return (
+    peek.anticipatedSpotIndex !== null &&
+    peek.anticipationStartedAtMs !== null &&
+    peek.peekStartedAtMs !== null &&
+    currentTimeMs < peek.peekStartedAtMs
+  );
 }
 
 export function isPeekActive(peek: NormalPeek, currentTimeMs: number): boolean {
@@ -275,6 +305,22 @@ export function getActiveNormalSpotIndices(
   return out;
 }
 
+function getReservedNormalSpotIndices(
+  peekState: PeekState,
+  currentTimeMs: number,
+): readonly number[] {
+  const out = new Set(getActiveNormalSpotIndices(peekState, currentTimeMs));
+  for (const peek of peekState.peeks) {
+    if (
+      isPeekAnticipating(peek, currentTimeMs) &&
+      peek.anticipatedSpotIndex !== null
+    ) {
+      out.add(peek.anticipatedSpotIndex);
+    }
+  }
+  return [...out];
+}
+
 export function computeRefillDelayMs(randomValue: number): number {
   const clamped = Math.max(0, Math.min(1, randomValue));
   return (
@@ -289,14 +335,53 @@ export function selectFreeSpotIndex(
   spotCount: number,
   randomValue: number,
 ): number | null {
-  const active = new Set(getActiveNormalSpotIndices(peekState, currentTimeMs));
+  const active = new Set(
+    getReservedNormalSpotIndices(peekState, currentTimeMs),
+  );
   const free: number[] = [];
   for (let i = 0; i < spotCount; i++) {
     if (!active.has(i)) free.push(i);
   }
   if (free.length === 0) return null;
-  const index = Math.floor(randomValue * free.length);
-  return free[Math.min(index, free.length - 1)] ?? null;
+
+  const recent = peekState.recentSpotIndices.filter((spot) => spot < spotCount);
+  const recentSet = new Set(recent);
+  const candidates =
+    recent.length > 0 ? free.filter((spot) => !recentSet.has(spot)) : free;
+  const pool = candidates.length > 0 ? candidates : free;
+
+  let bestDistance = -1;
+  const scored = pool.map((spot) => {
+    let distance = 0;
+    if (recent.length > 0) {
+      const spotPosition = FARMYARD_LAYOUT.hidingSpots[spot];
+      if (spotPosition !== undefined) {
+        let shortest = Number.POSITIVE_INFINITY;
+        for (const recentSpot of recent) {
+          const recentPosition = FARMYARD_LAYOUT.hidingSpots[recentSpot];
+          if (recentPosition === undefined) continue;
+          const dx = spotPosition.x - recentPosition.x;
+          const dy = spotPosition.y - recentPosition.y;
+          const d = Math.hypot(dx, dy);
+          if (d < shortest) shortest = d;
+        }
+        if (shortest !== Number.POSITIVE_INFINITY) {
+          distance = shortest;
+        }
+      }
+    }
+    if (distance > bestDistance) {
+      bestDistance = distance;
+    }
+    return { spot, distance };
+  });
+
+  const best =
+    recent.length > 0
+      ? scored.filter((candidate) => candidate.distance === bestDistance)
+      : scored;
+  const index = Math.floor(randomValue * best.length);
+  return best[Math.min(index, best.length - 1)]?.spot ?? null;
 }
 
 function fillSlotAt(
@@ -308,7 +393,34 @@ function fillSlotAt(
     activeSpotIndex: spotIndex,
     peekStartedAtMs: currentTimeMs,
     nextRefillAtMs: null,
+    anticipationStartedAtMs: null,
+    anticipatedSpotIndex: null,
   };
+}
+
+function startAnticipation(
+  peek: NormalPeek,
+  spotIndex: number,
+  currentTimeMs: number,
+  activationTimeMs: number,
+): NormalPeek {
+  return {
+    activeSpotIndex: null,
+    peekStartedAtMs: activationTimeMs,
+    nextRefillAtMs: null,
+    anticipationStartedAtMs: currentTimeMs,
+    anticipatedSpotIndex: spotIndex,
+  };
+}
+
+function activateAnticipation(
+  peek: NormalPeek,
+  currentTimeMs: number,
+): NormalPeek {
+  if (peek.anticipatedSpotIndex === null) {
+    return peek;
+  }
+  return fillSlotAt(peek, peek.anticipatedSpotIndex, currentTimeMs);
 }
 
 function expireSlot(
@@ -320,6 +432,8 @@ function expireSlot(
     activeSpotIndex: null,
     peekStartedAtMs: null,
     nextRefillAtMs: currentTimeMs + computeRefillDelayMs(random()),
+    anticipationStartedAtMs: null,
+    anticipatedSpotIndex: null,
   };
 }
 
@@ -331,18 +445,49 @@ export function tickPeekState(
 ): PeekState {
   const peeks: NormalPeek[] = [];
   let workingState = peekState;
+  const syncWorkingPeeks = (): void => {
+    workingState = {
+      ...workingState,
+      peeks: [...peeks, ...peekState.peeks.slice(peeks.length)],
+    };
+  };
   for (const peek of peekState.peeks) {
     if (peek.activeSpotIndex !== null && peek.peekStartedAtMs !== null) {
       if (currentTimeMs - peek.peekStartedAtMs >= NORMAL_PEEK_DURATION_MS) {
         const expired = expireSlot(peek, currentTimeMs, random);
         peeks.push(expired);
-        workingState = { peeks };
+        syncWorkingPeeks();
+        workingState = rememberSpot(workingState, peek.activeSpotIndex);
       } else {
         peeks.push(peek);
+        syncWorkingPeeks();
       }
       continue;
     }
-    if (peek.nextRefillAtMs !== null && currentTimeMs >= peek.nextRefillAtMs) {
+
+    if (
+      peek.anticipatedSpotIndex !== null &&
+      peek.anticipationStartedAtMs !== null &&
+      peek.peekStartedAtMs !== null
+    ) {
+      if (currentTimeMs >= peek.peekStartedAtMs) {
+        const activated = activateAnticipation(peek, currentTimeMs);
+        peeks.push(activated);
+        syncWorkingPeeks();
+        if (activated.activeSpotIndex !== null) {
+          workingState = rememberSpot(workingState, activated.activeSpotIndex);
+        }
+      } else {
+        peeks.push(peek);
+        syncWorkingPeeks();
+      }
+      continue;
+    }
+
+    if (
+      peek.nextRefillAtMs !== null &&
+      currentTimeMs >= peek.nextRefillAtMs - PEEK_ANTICIPATION_DURATION_MS
+    ) {
       const spot = selectFreeSpotIndex(
         workingState,
         currentTimeMs,
@@ -351,15 +496,61 @@ export function tickPeekState(
       );
       if (spot === null) {
         peeks.push(peek);
+        syncWorkingPeeks();
       } else {
-        peeks.push(fillSlotAt(peek, spot, currentTimeMs));
-        workingState = { peeks };
+        const anticipationStartedAtMs = currentTimeMs;
+        const anticipated = startAnticipation(
+          peek,
+          spot,
+          anticipationStartedAtMs,
+          peek.nextRefillAtMs,
+        );
+        if (currentTimeMs >= anticipated.peekStartedAtMs!) {
+          const activated = activateAnticipation(anticipated, currentTimeMs);
+          peeks.push(activated);
+          syncWorkingPeeks();
+          workingState = rememberSpot(workingState, spot);
+        } else {
+          peeks.push(anticipated);
+          syncWorkingPeeks();
+        }
       }
       continue;
     }
     peeks.push(peek);
+    syncWorkingPeeks();
   }
-  return workingState;
+  return { ...workingState, peeks };
+}
+
+export interface PeekAnticipation {
+  slotIndex: number;
+  spotIndex: number;
+  startedAtMs: number;
+}
+
+export function getActivePeekAnticipations(
+  peekState: PeekState,
+  currentTimeMs: number,
+): PeekAnticipation[] {
+  return peekState.peeks.flatMap((peek, slotIndex) => {
+    if (!isPeekAnticipating(peek, currentTimeMs)) {
+      return [];
+    }
+    if (
+      peek.anticipatedSpotIndex === null ||
+      peek.anticipationStartedAtMs === null
+    ) {
+      return [];
+    }
+    return [
+      {
+        slotIndex,
+        spotIndex: peek.anticipatedSpotIndex,
+        startedAtMs: peek.anticipationStartedAtMs,
+      },
+    ];
+  });
 }
 
 export interface ClaimResult {
@@ -465,7 +656,7 @@ export function attemptClaim(
   );
   return {
     matchState: addScore(matchState, playerIndex, NORMAL_CHICK_POINTS),
-    peekState: { peeks: newPeeks },
+    peekState: rememberSpot({ ...peekState, peeks: newPeeks }, spotIndex),
     claimed: true,
   };
 }

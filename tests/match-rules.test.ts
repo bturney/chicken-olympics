@@ -21,6 +21,7 @@ import {
   PRODUCTION_MATCH_DURATION_MS,
   NORMAL_PEEK_COUNT,
   NORMAL_PEEK_DURATION_MS,
+  PEEK_ANTICIPATION_DURATION_MS,
   NORMAL_REFILL_MIN_MS,
   NORMAL_REFILL_MAX_MS,
   GREEN_CHICK_POINTS,
@@ -708,9 +709,10 @@ describe("normal peek slot constants", () => {
     expect(NORMAL_PEEK_DURATION_MS).toBe(5_000);
   });
 
-  it("uses 500ms to 1500ms refill delay bounds", () => {
-    expect(NORMAL_REFILL_MIN_MS).toBe(500);
-    expect(NORMAL_REFILL_MAX_MS).toBe(1_500);
+  it("keeps refill delay bounds long enough for visible anticipation cues", () => {
+    expect(NORMAL_REFILL_MIN_MS).toBe(900);
+    expect(NORMAL_REFILL_MAX_MS).toBe(1_900);
+    expect(NORMAL_REFILL_MIN_MS).toBeGreaterThan(PEEK_ANTICIPATION_DURATION_MS);
   });
 });
 
@@ -759,6 +761,15 @@ describe("tickPeekState", () => {
 
     const atExpiry = tickPeekState(state, 5_000, 6, constantRandom(0.5));
     expect(isPeekActive(atExpiry.peeks[0]!, 5_000)).toBe(false);
+  });
+
+  it("keeps later peek slots when an earlier slot expires", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+
+    const atExpiry = tickPeekState(state, 5_000, 6, constantRandom(0.5));
+
+    expect(atExpiry.peeks).toHaveLength(NORMAL_PEEK_COUNT);
+    expect(getActiveNormalSpotIndices(atExpiry, 5_000)).toHaveLength(0);
   });
 
   it("schedules a new peek in the free spot after the refill delay elapses", () => {
@@ -835,28 +846,27 @@ describe("selectFreeSpotIndex", () => {
   });
 
   it("returns a free spot when at least one is available", () => {
-    const state = tickPeekState(
-      createPeekState(),
-      0,
-      NORMAL_PEEK_COUNT,
-      constantRandom(0.5),
-    );
+    const state = createPeekState();
 
     const free = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.0);
-    expect(free).toBe(NORMAL_PEEK_COUNT);
+    expect(free).toBe(0);
   });
 
   it("picks deterministically based on the random value", () => {
-    const state = tickPeekState(
-      createPeekState(),
-      0,
-      NORMAL_PEEK_COUNT,
-      constantRandom(0.5),
-    );
+    const state = createPeekState();
 
     const a = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.0);
     const b = selectFreeSpotIndex(state, 0, NORMAL_PEEK_COUNT + 2, 0.999);
     expect(a).not.toBe(b);
+  });
+
+  it("prefers the farthest free spot from recent selections when avoiding a cluster", () => {
+    const state = {
+      ...createPeekState(),
+      recentSpotIndices: [1, 0],
+    };
+
+    expect(selectFreeSpotIndex(state, 0, 6, 0)).toBe(4);
   });
 });
 

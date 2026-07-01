@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 import type { PlayerChickenColor } from "../src/setup/colors";
 
+test.afterEach(async ({ page }) => {
+  await page.evaluate(() => {
+    window.__CHICKEN_OLYMPICS__?.destroy(true);
+  });
+});
+
 function getSceneKey(
   page: import("@playwright/test").Page,
 ): Promise<string | null> {
@@ -115,13 +121,55 @@ function getMatchTextureColor(
     if (!source) return null;
     const ctx = source.getContext("2d");
     if (!ctx) return null;
-    // Sample the texture's center, which is the middle of the player circle
-    // regardless of the resolution scale factor.
-    const cx = Math.floor(source.width / 2);
-    const cy = Math.floor(source.height / 2);
-    const pixel = ctx.getImageData(cx, cy, 1, 1).data;
-    return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0 };
+    const pixels = ctx.getImageData(0, 0, source.width, source.height).data;
+    const counts = new Map<string, number>();
+    for (let i = 0; i < pixels.length; i += 4) {
+      const alpha = pixels[i + 3] ?? 0;
+      if (alpha === 0) continue;
+      const key = `${pixels[i] ?? 0},${pixels[i + 1] ?? 0},${pixels[i + 2] ?? 0}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    let dominant = "";
+    let dominantCount = -1;
+    for (const [key, count] of counts) {
+      if (count > dominantCount) {
+        dominant = key;
+        dominantCount = count;
+      }
+    }
+    if (!dominant) return null;
+    const [r = 0, g = 0, b = 0] = dominant.split(",").map(Number);
+    return { r, g, b };
   }, textureKey);
+}
+
+function getMatchTexturePixel(
+  page: import("@playwright/test").Page,
+  textureKey: string,
+  x: number,
+  y: number,
+): Promise<{ r: number; g: number; b: number; a: number } | null> {
+  return page.evaluate(
+    ({ key, x, y }) => {
+      const game = window.__CHICKEN_OLYMPICS__;
+      if (!game) return null;
+      const textureManager = game.textures;
+      const texture = textureManager.get(key);
+      if (!texture) return null;
+      const source = texture.getSourceImage() as HTMLCanvasElement | null;
+      if (!source) return null;
+      const ctx = source.getContext("2d");
+      if (!ctx) return null;
+      const pixel = ctx.getImageData(x, y, 1, 1).data;
+      return {
+        r: pixel[0] ?? 0,
+        g: pixel[1] ?? 0,
+        b: pixel[2] ?? 0,
+        a: pixel[3] ?? 0,
+      };
+    },
+    { key: textureKey, x, y },
+  );
 }
 
 function cssHexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -247,6 +295,39 @@ test("Match scene renders Player Chicken textures and HUD in the selected colors
   expect(p2TextureColor).toEqual(EXPECTED_HEX.orange);
 });
 
+test("Match scene gives each Player Chicken a mirrored beak and a more chicken-like silhouette", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  const p1Beak = await getMatchTexturePixel(page, "p1_chicken_blue", 78, 52);
+  const p2Beak = await getMatchTexturePixel(page, "p2_chicken_red", 34, 52);
+  const p1Center = await getMatchTextureColor(page, "p1_chicken_blue");
+
+  expect(p1Beak).not.toBeNull();
+  expect(p2Beak).not.toBeNull();
+  expect(p1Center).not.toBeNull();
+
+  const beak = cssHexToRgb("#ffbf4d");
+  expect(beak).not.toBeNull();
+  expect(p1Beak).toMatchObject(beak!);
+  expect(p2Beak).toMatchObject(beak!);
+  expect(p1Beak).not.toEqual(p1Center);
+});
+
 interface ProductionMatchDefaultsProbe {
   durationMs: number;
   elapsedMs: number;
@@ -347,6 +428,15 @@ interface PodiumProbe {
   p1ScoreTextColor: string;
   p2ScoreTextColor: string;
   resultText: string;
+  titleScaleX: number;
+  titleScaleY: number;
+  titlePopStartScale: number | null;
+  player1ScaleX: number;
+  player1ScaleY: number;
+  player1PopStartScale: number | null;
+  player2ScaleX: number;
+  player2ScaleY: number;
+  player2PopStartScale: number | null;
   chickenTextureKeys: string[];
 }
 
@@ -365,6 +455,9 @@ function probePodium(
           text?: string;
           style?: { color?: string };
           texture?: { key: string };
+          scaleX?: number;
+          scaleY?: number;
+          getData?: (key: string) => unknown;
         }>;
       };
     };
@@ -379,12 +472,37 @@ function probePodium(
         t.text === "Player 2 Wins!" ||
         t.text === "It's a Tie!",
     );
+    const titleText = texts.find((t) => t.text === "Podium Ceremony");
+    const podiumP1 = images.find((i) =>
+      i.texture?.key?.startsWith("podium_p1_"),
+    );
+    const podiumP2 = images.find((i) =>
+      i.texture?.key?.startsWith("podium_p2_"),
+    );
     return {
       p1ScoreText: scoreP1?.text ?? "",
       p2ScoreText: scoreP2?.text ?? "",
       p1ScoreTextColor: scoreP1?.style?.color ?? "",
       p2ScoreTextColor: scoreP2?.style?.color ?? "",
       resultText: resultText?.text ?? "",
+      titleScaleX: titleText?.scaleX ?? 0,
+      titleScaleY: titleText?.scaleY ?? 0,
+      titlePopStartScale:
+        typeof titleText?.getData?.("celebrationPopStartScale") === "number"
+          ? (titleText.getData("celebrationPopStartScale") as number)
+          : null,
+      player1ScaleX: podiumP1?.scaleX ?? 0,
+      player1ScaleY: podiumP1?.scaleY ?? 0,
+      player1PopStartScale:
+        typeof podiumP1?.getData?.("celebrationPopStartScale") === "number"
+          ? (podiumP1.getData("celebrationPopStartScale") as number)
+          : null,
+      player2ScaleX: podiumP2?.scaleX ?? 0,
+      player2ScaleY: podiumP2?.scaleY ?? 0,
+      player2PopStartScale:
+        typeof podiumP2?.getData?.("celebrationPopStartScale") === "number"
+          ? (podiumP2.getData("celebrationPopStartScale") as number)
+          : null,
       chickenTextureKeys: images
         .map((i) => i.texture?.key)
         .filter((k): k is string => typeof k === "string"),
@@ -499,13 +617,25 @@ async function movePlayerOntoActiveChick(
 interface ClaimFeedbackProbe {
   chickBodies: Array<{
     tintTopLeft: number;
+    tintMode: number;
     scaleX: number;
     scaleY: number;
+    visible: boolean;
+  }>;
+  claimScoreEchoes: Array<{
+    text: string;
+    x: number;
+    y: number;
+    alpha: number;
     visible: boolean;
   }>;
   scores: [number, number];
   p1ScoreText: string;
   p2ScoreText: string;
+  p1ScoreScaleX: number;
+  p1ScoreScaleY: number;
+  p2ScoreScaleX: number;
+  p2ScoreScaleY: number;
   activeClaimAnimationCount: number;
   elapsedMs: number;
   animationDetails: Array<{
@@ -526,15 +656,25 @@ function probeClaimFeedback(
     const match = scene as unknown as {
       chickBodies: Array<{
         tintTopLeft: number;
+        tintMode: number;
         scaleX: number;
         scaleY: number;
         visible: boolean;
       }>;
+      claimScoreEchoes: Array<{
+        text: {
+          text: string;
+          x: number;
+          y: number;
+          alpha: number;
+          visible: boolean;
+        };
+      }>;
       match: { matchState: { scores: [number, number]; elapsedMs: number } };
-      p1ScoreText: { text: string };
-      p2ScoreText: { text: string };
-      claimAnimationState: {
-        animations: Array<{
+      p1ScoreText: { text: string; scaleX: number; scaleY: number };
+      p2ScoreText: { text: string; scaleX: number; scaleY: number };
+      presentationFeedback: {
+        claimAnimations: Array<{
           slotIndex: number;
           playerIndex: number;
           startedAtMs: number;
@@ -544,16 +684,29 @@ function probeClaimFeedback(
     return {
       chickBodies: match.chickBodies.map((b) => ({
         tintTopLeft: b.tintTopLeft,
+        tintMode: b.tintMode,
         scaleX: b.scaleX,
         scaleY: b.scaleY,
         visible: b.visible,
       })),
+      claimScoreEchoes: match.claimScoreEchoes.map((echo) => ({
+        text: echo.text.text,
+        x: echo.text.x,
+        y: echo.text.y,
+        alpha: echo.text.alpha,
+        visible: echo.text.visible,
+      })),
       scores: match.match.matchState.scores,
       p1ScoreText: match.p1ScoreText.text,
       p2ScoreText: match.p2ScoreText.text,
-      activeClaimAnimationCount: match.claimAnimationState.animations.length,
+      p1ScoreScaleX: match.p1ScoreText.scaleX,
+      p1ScoreScaleY: match.p1ScoreText.scaleY,
+      p2ScoreScaleX: match.p2ScoreText.scaleX,
+      p2ScoreScaleY: match.p2ScoreText.scaleY,
+      activeClaimAnimationCount:
+        match.presentationFeedback.claimAnimations.length,
       elapsedMs: match.match.matchState.elapsedMs,
-      animationDetails: match.claimAnimationState.animations.map((a) => ({
+      animationDetails: match.presentationFeedback.claimAnimations.map((a) => ({
         slotIndex: a.slotIndex,
         playerIndex: a.playerIndex,
         startedAtMs: a.startedAtMs,
@@ -606,8 +759,16 @@ test("claiming a normal Chick tints it the claiming player's color, pops it, and
 
   const after = await probeClaimFeedback(page);
   expect(after).not.toBeNull();
+  expect(after!.claimScoreEchoes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ text: "+1", visible: true }),
+    ]),
+  );
+  expect(after!.p1ScoreScaleX).toBeGreaterThan(1);
+  expect(after!.p1ScoreScaleY).toBeGreaterThan(1);
   const claimed = after!.chickBodies.find((b) => b.tintTopLeft === 0x4488ff);
   expect(claimed).toBeDefined();
+  expect(claimed?.tintMode).toBe(1);
   expect(claimed?.visible).toBe(true);
   expect(claimed?.scaleX).toBeGreaterThan(0);
   expect(claimed?.scaleX).toBeLessThanOrEqual(1.5);
@@ -667,7 +828,13 @@ interface GreenChickProbe {
     activeSpotIndex: number | null;
     peekStartedAtMs: number | null;
   };
-  greenChickBody: { x: number; y: number; visible: boolean };
+  greenChickBody: {
+    x: number;
+    y: number;
+    visible: boolean;
+    scaleX: number;
+    scaleY: number;
+  };
   scores: [number, number];
   p1ScoreText: string;
   p2ScoreText: string;
@@ -692,7 +859,13 @@ function probeGreenChick(
         };
         matchState: { scores: [number, number]; elapsedMs: number };
       };
-      greenChickBody: { x: number; y: number; visible: boolean };
+      greenChickBody: {
+        x: number;
+        y: number;
+        visible: boolean;
+        scaleX: number;
+        scaleY: number;
+      };
       p1ScoreText: { text: string };
       p2ScoreText: { text: string };
     };
@@ -707,14 +880,19 @@ function probeGreenChick(
   });
 }
 
-async function activateGreenChickForTest(
+interface GreenChickClaimRenderProbe extends GreenChickProbe {
+  called: boolean;
+}
+
+function claimGreenChickForRenderTest(
   page: import("@playwright/test").Page,
-): Promise<void> {
-  await page.evaluate(() => {
+): Promise<GreenChickClaimRenderProbe | null> {
+  return page.evaluate(() => {
     const game = window.__CHICKEN_OLYMPICS__;
-    if (!game) return;
+    if (!game) return null;
     const scene = game.scene.getScene("MatchScene");
-    if (!scene) return;
+    if (!scene) return null;
+    game.loop.stop();
     const match = scene as unknown as {
       match: {
         greenChickState: {
@@ -725,16 +903,25 @@ async function activateGreenChickForTest(
           claimedAtMs: number | null;
           claimedByPlayerIndex: 0 | 1 | null;
         };
-        matchState: { elapsedMs: number };
+        matchState: { scores: [number, number]; elapsedMs: number };
       };
+      greenClaimBeat?: { startedAtMs: number } | null;
       greenChickBody: {
         x: number;
         y: number;
+        visible: boolean;
+        scaleX: number;
+        scaleY: number;
         body: { enable: boolean } | null;
         setPosition: (x: number, y: number) => void;
         setVisible: (v: boolean) => void;
       };
+      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
+      renderGreenChick: () => void;
+      p1ScoreText: { text: string };
+      p2ScoreText: { text: string };
     };
+
     match.match.greenChickState = {
       status: "active",
       scheduledAtMs: 0,
@@ -748,6 +935,30 @@ async function activateGreenChickForTest(
     if (match.greenChickBody.body) {
       match.greenChickBody.body.enable = true;
     }
+
+    match.handleGreenChickClaim(0);
+
+    const beat = match.greenClaimBeat ?? null;
+    if (beat !== null) {
+      match.match.matchState.elapsedMs = beat.startedAtMs + 300;
+      match.renderGreenChick();
+    }
+
+    return {
+      called: true,
+      greenChickState: match.match.greenChickState,
+      greenChickBody: {
+        x: match.greenChickBody.x,
+        y: match.greenChickBody.y,
+        visible: match.greenChickBody.visible,
+        scaleX: match.greenChickBody.scaleX,
+        scaleY: match.greenChickBody.scaleY,
+      },
+      scores: match.match.matchState.scores,
+      p1ScoreText: match.p1ScoreText.text,
+      p2ScoreText: match.p2ScoreText.text,
+      elapsedMs: match.match.matchState.elapsedMs,
+    };
   });
 }
 
@@ -800,31 +1011,18 @@ test("Green Chick renders as an extra peek and awards five points when claimed",
     })
     .toBe(3);
 
-  await activateGreenChickForTest(page);
-
-  await page.waitForTimeout(300);
-
-  const result = await page.evaluate(() => {
-    const game = window.__CHICKEN_OLYMPICS__;
-    if (!game) return null;
-    const scene = game.scene.getScene("MatchScene");
-    if (!scene) return null;
-    const match = scene as unknown as {
-      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
-    };
-    match.handleGreenChickClaim(0);
-    return { called: true };
+  const afterClaim = await claimGreenChickForRenderTest(page);
+  expect(afterClaim?.called).toBe(true);
+  expect(afterClaim).toMatchObject({
+    scores: [5, 0],
+    p1ScoreText: "P1 (Blue): 5",
+    greenChickState: { status: "claimed" },
+    greenChickBody: {
+      visible: true,
+    },
   });
-
-  expect(result?.called).toBe(true);
-
-  await expect
-    .poll(() => probeGreenChick(page), { timeout: 2_000 })
-    .toMatchObject({
-      scores: [5, 0],
-      p1ScoreText: "P1 (Blue): 5",
-      greenChickState: { status: "claimed" },
-    });
+  expect(afterClaim?.greenChickBody.scaleX).toBeGreaterThan(1.8);
+  expect(afterClaim?.greenChickBody.scaleY).toBeGreaterThan(1.8);
 });
 
 test("Green Chick does not return after the match continues past its expiry", async ({
@@ -845,26 +1043,11 @@ test("Green Chick does not return after the match continues past its expiry", as
 
   await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
 
-  await activateGreenChickForTest(page);
-
-  await page.waitForTimeout(300);
-
-  await page.evaluate(() => {
-    const game = window.__CHICKEN_OLYMPICS__;
-    if (!game) return;
-    const scene = game.scene.getScene("MatchScene");
-    if (!scene) return;
-    const match = scene as unknown as {
-      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
-    };
-    match.handleGreenChickClaim(0);
+  const beforeAdvance = await claimGreenChickForRenderTest(page);
+  expect(beforeAdvance).toMatchObject({
+    greenChickState: { status: "claimed" },
   });
 
-  await expect
-    .poll(() => probeGreenChick(page), { timeout: 2_000 })
-    .toMatchObject({ greenChickState: { status: "claimed" } });
-
-  const beforeAdvance = await probeGreenChick(page);
   expect(beforeAdvance?.elapsedMs).toBeDefined();
 
   await page.evaluate((targetElapsedMs) => {
@@ -873,14 +1056,20 @@ test("Green Chick does not return after the match continues past its expiry", as
     const scene = game.scene.getScene("MatchScene");
     if (!scene) return;
     const match = scene as unknown as {
-      match: { matchState: { elapsedMs: number } };
+      match: {
+        matchState: { elapsedMs: number };
+        advance: (deltaMs: number) => unknown;
+      };
+      renderGreenChick: () => void;
     };
     match.match.matchState.elapsedMs = targetElapsedMs;
+    match.match.advance(0);
+    match.renderGreenChick();
   }, 30_000);
 
-  await expect
-    .poll(() => probeGreenChick(page), { timeout: 2_000 })
-    .toMatchObject({ greenChickState: { status: "claimed" } });
+  expect(await probeGreenChick(page)).toMatchObject({
+    greenChickState: { status: "claimed" },
+  });
 });
 
 function probePlayedSfx(page: import("@playwright/test").Page): Promise<{
@@ -1038,6 +1227,42 @@ test("Podium Ceremony queues a celebratory SFX fanfare on entry", async ({
     .toMatchObject({
       podium: expect.arrayContaining(["podiumFanfare"]),
     });
+});
+
+test("Podium Ceremony gives the gold podium chicken and title a small celebratory pop", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeAttached();
+
+  await expect.poll(() => getSceneKey(page)).toBe("SetupScene");
+
+  const { scaleX, scaleY } = await getCanvasScale(page);
+
+  await canvas.click({ position: { x: 160 * scaleX, y: 180 * scaleY } });
+  await canvas.click({ position: { x: 320 * scaleX, y: 290 * scaleY } });
+  await canvas.click({ position: { x: 400 * scaleX, y: 380 * scaleY } });
+
+  await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
+
+  await completeMatchForTest(page, [3, 1]);
+
+  await expect.poll(() => getSceneKey(page)).toBe("PodiumScene");
+
+  await expect
+    .poll(() => probePodium(page), { timeout: 2_000, intervals: [16, 32, 64] })
+    .toMatchObject({
+      titleScaleX: expect.any(Number),
+      player1ScaleX: expect.any(Number),
+    });
+
+  const podium = await probePodium(page);
+  expect(podium).not.toBeNull();
+  expect(podium!.titlePopStartScale).toBeGreaterThan(1);
+  expect(podium!.player1PopStartScale).toBeGreaterThan(1);
+  expect(podium!.player2PopStartScale).toBeNull();
 });
 
 async function completeShortMatchForTest(

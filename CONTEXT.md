@@ -96,7 +96,6 @@ _Avoid_: Score popup, hit effect, notification
 A small player-colored score cue near a claim, such as a +1 or +5, paired with a gentle scoreboard bump so players connect the claim beat to scoring without making the scoreboard the main event.
 _Avoid_: Score explosion, combo UI, damage number
 
-
 **Silly-Triumphant Claim Beat**:
 A claim beat where the chick gives a playful hop, spin, chirp, or poof without making the claim feel aggressive. Normal claims keep this lightweight; the green chick claim may add a crowd-cheer layer because it is rare.
 _Avoid_: Attack, defeat, combat hit

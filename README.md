@@ -59,11 +59,8 @@ npm run typecheck
 npm run lint
 npm run format:check
 npm test
-npm run test:e2e
 npm run build
 ```
-
-If `npm run test:e2e` fails because local browser system libraries are missing, run `npm run test:e2e:setup` once, then rerun `npm run test:e2e`.
 
 ## Build
 

@@ -125,7 +125,7 @@ parent_slice_numbers() {
     -f labels=ready-for-agent \
     -f per_page=100 \
     --paginate \
-    --jq ".[] | select(.pull_request | not) | select(.number != $prd_number) | select((.body // \"\") as \$body | (\$body | contains(\"## Parent\")) and ((\$body | contains(\"https://github.com/$repo/issues/$prd_number\")) or (\$body | contains(\"$repo#$prd_number\")) or (\$body | contains(\"\\n#$prd_number\\n\")))) | .number" \
+    --jq ".[] | select(.pull_request | not) | select(.number != $prd_number) | select((.body // \"\") as \$body | (\$body | contains(\"## Parent\")) and ((\$body | contains(\"https://github.com/$repo/issues/$prd_number\")) or (\$body | contains(\"$repo#$prd_number\")) or (\$body | contains(\"\\n#$prd_number\\n\")) or (\$body | contains(\"\\n- #$prd_number\\n\")))) | .number" \
     | sort -n
 }
 

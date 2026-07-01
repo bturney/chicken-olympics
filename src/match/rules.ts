@@ -311,7 +311,10 @@ function getReservedNormalSpotIndices(
 ): readonly number[] {
   const out = new Set(getActiveNormalSpotIndices(peekState, currentTimeMs));
   for (const peek of peekState.peeks) {
-    if (isPeekAnticipating(peek, currentTimeMs) && peek.anticipatedSpotIndex !== null) {
+    if (
+      isPeekAnticipating(peek, currentTimeMs) &&
+      peek.anticipatedSpotIndex !== null
+    ) {
       out.add(peek.anticipatedSpotIndex);
     }
   }
@@ -332,7 +335,9 @@ export function selectFreeSpotIndex(
   spotCount: number,
   randomValue: number,
 ): number | null {
-  const active = new Set(getReservedNormalSpotIndices(peekState, currentTimeMs));
+  const active = new Set(
+    getReservedNormalSpotIndices(peekState, currentTimeMs),
+  );
   const free: number[] = [];
   for (let i = 0; i < spotCount; i++) {
     if (!active.has(i)) free.push(i);
@@ -342,9 +347,7 @@ export function selectFreeSpotIndex(
   const recent = peekState.recentSpotIndices.filter((spot) => spot < spotCount);
   const recentSet = new Set(recent);
   const candidates =
-    recent.length > 0
-      ? free.filter((spot) => !recentSet.has(spot))
-      : free;
+    recent.length > 0 ? free.filter((spot) => !recentSet.has(spot)) : free;
   const pool = candidates.length > 0 ? candidates : free;
 
   let bestDistance = -1;
@@ -442,14 +445,22 @@ export function tickPeekState(
 ): PeekState {
   const peeks: NormalPeek[] = [];
   let workingState = peekState;
+  const syncWorkingPeeks = (): void => {
+    workingState = {
+      ...workingState,
+      peeks: [...peeks, ...peekState.peeks.slice(peeks.length)],
+    };
+  };
   for (const peek of peekState.peeks) {
     if (peek.activeSpotIndex !== null && peek.peekStartedAtMs !== null) {
       if (currentTimeMs - peek.peekStartedAtMs >= NORMAL_PEEK_DURATION_MS) {
         const expired = expireSlot(peek, currentTimeMs, random);
         peeks.push(expired);
-        workingState = rememberSpot({ ...workingState, peeks }, peek.activeSpotIndex);
+        syncWorkingPeeks();
+        workingState = rememberSpot(workingState, peek.activeSpotIndex);
       } else {
         peeks.push(peek);
+        syncWorkingPeeks();
       }
       continue;
     }
@@ -462,11 +473,13 @@ export function tickPeekState(
       if (currentTimeMs >= peek.peekStartedAtMs) {
         const activated = activateAnticipation(peek, currentTimeMs);
         peeks.push(activated);
+        syncWorkingPeeks();
         if (activated.activeSpotIndex !== null) {
-          workingState = rememberSpot({ ...workingState, peeks }, activated.activeSpotIndex);
+          workingState = rememberSpot(workingState, activated.activeSpotIndex);
         }
       } else {
         peeks.push(peek);
+        syncWorkingPeeks();
       }
       continue;
     }
@@ -483,6 +496,7 @@ export function tickPeekState(
       );
       if (spot === null) {
         peeks.push(peek);
+        syncWorkingPeeks();
       } else {
         const anticipationStartedAtMs = currentTimeMs;
         const anticipated = startAnticipation(
@@ -494,17 +508,19 @@ export function tickPeekState(
         if (currentTimeMs >= anticipated.peekStartedAtMs!) {
           const activated = activateAnticipation(anticipated, currentTimeMs);
           peeks.push(activated);
-          workingState = rememberSpot({ ...workingState, peeks }, spot);
+          syncWorkingPeeks();
+          workingState = rememberSpot(workingState, spot);
         } else {
           peeks.push(anticipated);
-          workingState = { ...workingState, peeks };
+          syncWorkingPeeks();
         }
       }
       continue;
     }
     peeks.push(peek);
+    syncWorkingPeeks();
   }
-  return workingState;
+  return { ...workingState, peeks };
 }
 
 export interface PeekAnticipation {

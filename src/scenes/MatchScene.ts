@@ -251,11 +251,19 @@ export class MatchScene extends Phaser.Scene {
     const gfx = this.add.graphics();
 
     this.drawPlayerChickenTexture(gfx, 1, this.p1Color);
-    gfx.generateTexture(playerTextureKey(1, this.p1Color), PLAYER_SIZE * 2, PLAYER_SIZE * 2);
+    gfx.generateTexture(
+      playerTextureKey(1, this.p1Color),
+      PLAYER_SIZE * 2,
+      PLAYER_SIZE * 2,
+    );
 
     gfx.clear();
     this.drawPlayerChickenTexture(gfx, 2, this.p2Color);
-    gfx.generateTexture(playerTextureKey(2, this.p2Color), PLAYER_SIZE * 2, PLAYER_SIZE * 2);
+    gfx.generateTexture(
+      playerTextureKey(2, this.p2Color),
+      PLAYER_SIZE * 2,
+      PLAYER_SIZE * 2,
+    );
 
     gfx.destroy();
 
@@ -501,7 +509,7 @@ export class MatchScene extends Phaser.Scene {
   private cleanupClaimScoreEchoes(): void {
     const now = this.match.view().elapsedMs;
     for (const echo of [...this.claimScoreEchoes]) {
-      const expiresAtMs = echo.text.getData("expiresAtMs");
+      const expiresAtMs: unknown = echo.text.getData("expiresAtMs");
       if (typeof expiresAtMs === "number" && now >= expiresAtMs) {
         this.removeClaimScoreEcho(echo.text);
       }
@@ -674,7 +682,10 @@ export class MatchScene extends Phaser.Scene {
     this.p1Shadow.setAlpha(p1Personality.shadowAlpha);
     this.p1Label.setPosition(
       this.p1Chicken.x,
-      this.p1Chicken.y + PLAYER_SIZE + 4 * WORLD_SCALE + p1Personality.shadowYOffset * 0.15,
+      this.p1Chicken.y +
+        PLAYER_SIZE +
+        4 * WORLD_SCALE +
+        p1Personality.shadowYOffset * 0.15,
     );
 
     const p2Body = this.p2Chicken.body as Phaser.Physics.Arcade.Body | null;
@@ -698,7 +709,10 @@ export class MatchScene extends Phaser.Scene {
     this.p2Shadow.setAlpha(p2Personality.shadowAlpha);
     this.p2Label.setPosition(
       this.p2Chicken.x,
-      this.p2Chicken.y + PLAYER_SIZE + 4 * WORLD_SCALE + p2Personality.shadowYOffset * 0.15,
+      this.p2Chicken.y +
+        PLAYER_SIZE +
+        4 * WORLD_SCALE +
+        p2Personality.shadowYOffset * 0.15,
     );
   }
 
@@ -750,7 +764,8 @@ export class MatchScene extends Phaser.Scene {
       const spot = FARMYARD_LAYOUT.hidingSpots[anticipation.spotIndex];
       if (!spot) continue;
 
-      const wobble = Math.sin((view.elapsedMs - anticipation.startedAtMs) / 60) * 2;
+      const wobble =
+        Math.sin((view.elapsedMs - anticipation.startedAtMs) / 60) * 2;
       const radius = 16 * WORLD_SCALE + wobble;
 
       this.peekAnticipationLayer.lineStyle(2, 0xfff2a0, 0.45);
@@ -770,7 +785,8 @@ export class MatchScene extends Phaser.Scene {
     const greenClaimBeat = this.greenClaimBeat;
 
     if (greenClaimBeat !== null) {
-      const spot = FARMYARD_LAYOUT.hidingSpots[greenClaimBeat.spotIndex] ?? null;
+      const spot =
+        FARMYARD_LAYOUT.hidingSpots[greenClaimBeat.spotIndex] ?? null;
       if (!spot) return;
 
       const scale = this.computeGreenClaimBeatScale(
@@ -778,7 +794,9 @@ export class MatchScene extends Phaser.Scene {
         view.elapsedMs,
       );
       this.greenChickBody.setPosition(spot.x, spot.y);
-      this.greenChickBody.setTint(this.getPlayerColor(greenClaimBeat.playerIndex));
+      this.greenChickBody.setTint(
+        this.getPlayerColor(greenClaimBeat.playerIndex),
+      );
       this.greenChickBody.setScale(scale);
       this.greenChickBody.body!.enable = false;
       this.greenChickBody.setVisible(true);
@@ -818,7 +836,10 @@ export class MatchScene extends Phaser.Scene {
     const beat = this.greenClaimBeat;
     if (beat === null) return;
 
-    if (this.match.view().elapsedMs - beat.startedAtMs >= GREEN_CLAIM_BEAT_DURATION_MS) {
+    if (
+      this.match.view().elapsedMs - beat.startedAtMs >=
+      GREEN_CLAIM_BEAT_DURATION_MS
+    ) {
       this.greenClaimBeat = null;
       this.greenClaimBurstLayer.clear();
     }

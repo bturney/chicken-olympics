@@ -72,9 +72,9 @@ describe("Match", () => {
 
     const cueView = match.view();
     expect(cueView.peekAnticipations).toHaveLength(3);
-    expect(new Set(cueView.peekAnticipations.map((cue) => cue.spotIndex)).size).toBe(
-      3,
-    );
+    expect(
+      new Set(cueView.peekAnticipations.map((cue) => cue.spotIndex)).size,
+    ).toBe(3);
     expect(cueView.normalChicks).toHaveLength(0);
 
     match.advance(NORMAL_REFILL_MIN_MS - PEEK_ANTICIPATION_DURATION_MS);
@@ -104,9 +104,9 @@ describe("Match", () => {
       },
     ]);
     expect(match.view().scores).toEqual([0, 1]);
-    expect(match.view().normalChicks.map((chick) => chick.spotIndex)).not.toContain(
-      activeSpot,
-    );
+    expect(
+      match.view().normalChicks.map((chick) => chick.spotIndex),
+    ).not.toContain(activeSpot);
   });
 
   it("does not immediately refill a just-claimed hiding spot when another free spot exists", () => {
@@ -121,9 +121,9 @@ describe("Match", () => {
     match.claim(claimedSpot, 0);
     match.advance(500);
 
-    expect(match.view().normalChicks.map((chick) => chick.spotIndex)).not.toContain(
-      claimedSpot,
-    );
+    expect(
+      match.view().normalChicks.map((chick) => chick.spotIndex),
+    ).not.toContain(claimedSpot);
   });
 
   it("shows the Green Chick once in its schedule window without reusing a normal chick spot", () => {
@@ -141,9 +141,9 @@ describe("Match", () => {
       { type: "greenChickAppeared", spotIndex: greenSpot ?? -1 },
     ]);
     expect(match.view().greenChick).toEqual({ spotIndex: greenSpot ?? -1 });
-    expect(match.view().normalChicks.map((chick) => chick.spotIndex)).not.toContain(
-      greenSpot,
-    );
+    expect(
+      match.view().normalChicks.map((chick) => chick.spotIndex),
+    ).not.toContain(greenSpot);
   });
 
   it("lets a player claim the Green Chick for five points through the same claim path", () => {
@@ -177,7 +177,9 @@ describe("Match", () => {
     const greenSpot = match.view().greenChick?.spotIndex ?? 0;
     const events = match.advance(5_000);
 
-    expect(events).toEqual([{ type: "greenChickMissed", spotIndex: greenSpot }]);
+    expect(events).toEqual([
+      { type: "greenChickMissed", spotIndex: greenSpot },
+    ]);
     expect(match.view().greenChick).toBeNull();
   });
 });

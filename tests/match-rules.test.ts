@@ -761,6 +761,15 @@ describe("tickPeekState", () => {
     expect(isPeekActive(atExpiry.peeks[0]!, 5_000)).toBe(false);
   });
 
+  it("keeps later peek slots when an earlier slot expires", () => {
+    const state = tickPeekState(createPeekState(), 0, 6, constantRandom(0.5));
+
+    const atExpiry = tickPeekState(state, 5_000, 6, constantRandom(0.5));
+
+    expect(atExpiry.peeks).toHaveLength(NORMAL_PEEK_COUNT);
+    expect(getActiveNormalSpotIndices(atExpiry, 5_000)).toHaveLength(0);
+  });
+
   it("schedules a new peek in the free spot after the refill delay elapses", () => {
     let state = tickPeekState(createPeekState(), 0, 6, constantRandom(0));
     const initialActive = [...getActiveNormalSpotIndices(state, 0)];

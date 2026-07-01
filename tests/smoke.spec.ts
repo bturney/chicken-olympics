@@ -121,12 +121,25 @@ function getMatchTextureColor(
     if (!source) return null;
     const ctx = source.getContext("2d");
     if (!ctx) return null;
-    // Sample the top body ring. The texture center has darker face detail in
-    // the V2 chicken silhouette, while this spot remains the player color.
-    const cx = Math.floor(source.width / 2);
-    const cy = Math.floor(source.height * 0.16);
-    const pixel = ctx.getImageData(cx, cy, 1, 1).data;
-    return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0 };
+    const pixels = ctx.getImageData(0, 0, source.width, source.height).data;
+    const counts = new Map<string, number>();
+    for (let i = 0; i < pixels.length; i += 4) {
+      const alpha = pixels[i + 3] ?? 0;
+      if (alpha === 0) continue;
+      const key = `${pixels[i] ?? 0},${pixels[i + 1] ?? 0},${pixels[i + 2] ?? 0}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    let dominant = "";
+    let dominantCount = -1;
+    for (const [key, count] of counts) {
+      if (count > dominantCount) {
+        dominant = key;
+        dominantCount = count;
+      }
+    }
+    if (!dominant) return null;
+    const [r = 0, g = 0, b = 0] = dominant.split(",").map(Number);
+    return { r, g, b };
   }, textureKey);
 }
 
@@ -604,7 +617,7 @@ async function movePlayerOntoActiveChick(
 interface ClaimFeedbackProbe {
   chickBodies: Array<{
     tintTopLeft: number;
-    tintFill: boolean;
+    tintMode: number;
     scaleX: number;
     scaleY: number;
     visible: boolean;
@@ -643,7 +656,7 @@ function probeClaimFeedback(
     const match = scene as unknown as {
       chickBodies: Array<{
         tintTopLeft: number;
-        tintFill: boolean;
+        tintMode: number;
         scaleX: number;
         scaleY: number;
         visible: boolean;
@@ -671,7 +684,7 @@ function probeClaimFeedback(
     return {
       chickBodies: match.chickBodies.map((b) => ({
         tintTopLeft: b.tintTopLeft,
-        tintFill: b.tintFill,
+        tintMode: b.tintMode,
         scaleX: b.scaleX,
         scaleY: b.scaleY,
         visible: b.visible,
@@ -755,7 +768,7 @@ test("claiming a normal Chick tints it the claiming player's color, pops it, and
   expect(after!.p1ScoreScaleY).toBeGreaterThan(1);
   const claimed = after!.chickBodies.find((b) => b.tintTopLeft === 0x4488ff);
   expect(claimed).toBeDefined();
-  expect(claimed?.tintFill).toBe(true);
+  expect(claimed?.tintMode).toBe(1);
   expect(claimed?.visible).toBe(true);
   expect(claimed?.scaleX).toBeGreaterThan(0);
   expect(claimed?.scaleX).toBeLessThanOrEqual(1.5);

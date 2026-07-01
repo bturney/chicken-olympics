@@ -787,8 +787,7 @@ export class MatchScene extends Phaser.Scene {
           view.elapsedMs,
         );
         body.setPosition(spot.x, spot.y);
-        body.setTint(color);
-        body.setTintFill();
+        body.setTint(color).setTintMode(Phaser.TintModes.FILL);
         body.setScale(scale);
         body.body!.enable = false;
         body.setVisible(true);
@@ -853,10 +852,9 @@ export class MatchScene extends Phaser.Scene {
         view.elapsedMs,
       );
       this.greenChickBody.setPosition(spot.x, spot.y);
-      this.greenChickBody.setTint(
-        this.getPlayerColor(greenClaimBeat.playerIndex),
-      );
-      this.greenChickBody.setTintFill();
+      this.greenChickBody
+        .setTint(this.getPlayerColor(greenClaimBeat.playerIndex))
+        .setTintMode(Phaser.TintModes.FILL);
       this.greenChickBody.setScale(scale);
       this.greenChickBody.body!.enable = false;
       this.greenChickBody.setVisible(true);

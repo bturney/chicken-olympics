@@ -118,7 +118,7 @@ function getMatchTextureColor(
     // Sample the top body ring. The texture center has darker face detail in
     // the V2 chicken silhouette, while this spot remains the player color.
     const cx = Math.floor(source.width / 2);
-    const cy = Math.floor(source.height * 0.08);
+    const cy = Math.floor(source.height * 0.16);
     const pixel = ctx.getImageData(cx, cy, 1, 1).data;
     return { r: pixel[0] ?? 0, g: pixel[1] ?? 0, b: pixel[2] ?? 0 };
   }, textureKey);
@@ -294,8 +294,8 @@ test("Match scene gives each Player Chicken a mirrored beak and a more chicken-l
 
   await expect.poll(() => getSceneKey(page)).toBe("MatchScene");
 
-  const p1Beak = await getMatchTexturePixel(page, "p1_chicken_blue", 68, 59);
-  const p2Beak = await getMatchTexturePixel(page, "p2_chicken_red", 44, 59);
+  const p1Beak = await getMatchTexturePixel(page, "p1_chicken_blue", 78, 52);
+  const p2Beak = await getMatchTexturePixel(page, "p2_chicken_red", 34, 52);
   const p1Center = await getMatchTextureColor(page, "p1_chicken_blue");
 
   expect(p1Beak).not.toBeNull();
@@ -598,6 +598,7 @@ async function movePlayerOntoActiveChick(
 interface ClaimFeedbackProbe {
   chickBodies: Array<{
     tintTopLeft: number;
+    tintFill: boolean;
     scaleX: number;
     scaleY: number;
     visible: boolean;
@@ -636,6 +637,7 @@ function probeClaimFeedback(
     const match = scene as unknown as {
       chickBodies: Array<{
         tintTopLeft: number;
+        tintFill: boolean;
         scaleX: number;
         scaleY: number;
         visible: boolean;
@@ -663,6 +665,7 @@ function probeClaimFeedback(
     return {
       chickBodies: match.chickBodies.map((b) => ({
         tintTopLeft: b.tintTopLeft,
+        tintFill: b.tintFill,
         scaleX: b.scaleX,
         scaleY: b.scaleY,
         visible: b.visible,
@@ -746,6 +749,7 @@ test("claiming a normal Chick tints it the claiming player's color, pops it, and
   expect(after!.p1ScoreScaleY).toBeGreaterThan(1);
   const claimed = after!.chickBodies.find((b) => b.tintTopLeft === 0x4488ff);
   expect(claimed).toBeDefined();
+  expect(claimed?.tintFill).toBe(true);
   expect(claimed?.visible).toBe(true);
   expect(claimed?.scaleX).toBeGreaterThan(0);
   expect(claimed?.scaleX).toBeLessThanOrEqual(1.5);
@@ -980,8 +984,8 @@ test("Green Chick renders as an extra peek and awards five points when claimed",
     });
 
   const afterClaim = await probeGreenChick(page);
-  expect(afterClaim?.greenChickBody.scaleX).toBeGreaterThan(1.4);
-  expect(afterClaim?.greenChickBody.scaleY).toBeGreaterThan(1.4);
+  expect(afterClaim?.greenChickBody.scaleX).toBeGreaterThan(1.8);
+  expect(afterClaim?.greenChickBody.scaleY).toBeGreaterThan(1.8);
 });
 
 test("Green Chick does not return after the match continues past its expiry", async ({

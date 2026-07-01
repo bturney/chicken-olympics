@@ -54,9 +54,9 @@ export function getWinner(state: MatchState): 0 | 1 | null {
 
 export const NORMAL_PEEK_COUNT = 3;
 export const NORMAL_PEEK_DURATION_MS = 5_000;
-export const NORMAL_REFILL_MIN_MS = 500;
-export const NORMAL_REFILL_MAX_MS = 1_500;
-export const PEEK_ANTICIPATION_DURATION_MS = 250;
+export const NORMAL_REFILL_MIN_MS = 900;
+export const NORMAL_REFILL_MAX_MS = 1_900;
+export const PEEK_ANTICIPATION_DURATION_MS = 700;
 export const NORMAL_CHICK_POINTS = 1;
 
 export const GREEN_CHICK_POINTS = 5;

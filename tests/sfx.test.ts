@@ -51,8 +51,17 @@ describe("SFX_GREEN_CHICK_CLAIM", () => {
     expect(SFX_GREEN_CHICK_CLAIM.events.length).toBeGreaterThan(0);
   });
 
-  it("stays short so the celebratory feedback is punchy", () => {
-    expect(momentDuration(SFX_GREEN_CHICK_CLAIM)).toBeLessThan(0.5);
+  it("includes a crowd-like noise layer for the rare celebration", () => {
+    const noise = SFX_GREEN_CHICK_CLAIM.events.filter(
+      (e) => e.kind === "noise",
+    );
+
+    expect(noise.length).toBeGreaterThanOrEqual(1);
+    expect(noise[0]?.duration).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it("stays short enough that the Match does not stop for it", () => {
+    expect(momentDuration(SFX_GREEN_CHICK_CLAIM)).toBeLessThan(1);
   });
 });
 
@@ -66,6 +75,12 @@ describe("SFX_PODIUM_FANFARE", () => {
     const frequencies = new Set(tones.map((e) => e.frequencyHz));
     expect(tones.length).toBeGreaterThanOrEqual(2);
     expect(frequencies.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("adds a light crowd bed under the fanfare", () => {
+    expect(SFX_PODIUM_FANFARE.events.some((e) => e.kind === "noise")).toBe(
+      true,
+    );
   });
 });
 

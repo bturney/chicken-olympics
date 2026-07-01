@@ -21,6 +21,7 @@ import {
   PRODUCTION_MATCH_DURATION_MS,
   NORMAL_PEEK_COUNT,
   NORMAL_PEEK_DURATION_MS,
+  PEEK_ANTICIPATION_DURATION_MS,
   NORMAL_REFILL_MIN_MS,
   NORMAL_REFILL_MAX_MS,
   GREEN_CHICK_POINTS,
@@ -708,9 +709,10 @@ describe("normal peek slot constants", () => {
     expect(NORMAL_PEEK_DURATION_MS).toBe(5_000);
   });
 
-  it("uses 500ms to 1500ms refill delay bounds", () => {
-    expect(NORMAL_REFILL_MIN_MS).toBe(500);
-    expect(NORMAL_REFILL_MAX_MS).toBe(1_500);
+  it("keeps refill delay bounds long enough for visible anticipation cues", () => {
+    expect(NORMAL_REFILL_MIN_MS).toBe(900);
+    expect(NORMAL_REFILL_MAX_MS).toBe(1_900);
+    expect(NORMAL_REFILL_MIN_MS).toBeGreaterThan(PEEK_ANTICIPATION_DURATION_MS);
   });
 });
 

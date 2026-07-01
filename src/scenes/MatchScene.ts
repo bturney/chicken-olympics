@@ -54,8 +54,9 @@ interface GreenClaimBeat {
   startedAtMs: number;
 }
 
-const GREEN_CLAIM_BEAT_DURATION_MS = 520;
-const GREEN_CLAIM_BEAT_PEAK_SCALE = 1.8;
+const GREEN_CHICK_VISIBLE_SCALE = 1.35;
+const GREEN_CLAIM_BEAT_DURATION_MS = 850;
+const GREEN_CLAIM_BEAT_PEAK_SCALE = 2.8;
 
 function playerTextureKey(player: 1 | 2, color: PlayerChickenColor): string {
   return `p${player}_chicken_${color}`;
@@ -331,7 +332,8 @@ export class MatchScene extends Phaser.Scene {
   ): void {
     const bodyColor = getPlayerChickenHex(color);
     const outlineColor = 0x2d1f16;
-    const wingColor = 0xe0b14a;
+    const wingColor = 0xffd166;
+    const bellyColor = 0xfff0c4;
     const beakColor = 0xffbf4d;
     const combColor = 0xff5d7a;
     const eyeColor = 0x241a14;
@@ -342,39 +344,68 @@ export class MatchScene extends Phaser.Scene {
     gfx.fillRect(0, 0, PLAYER_SIZE * 2, PLAYER_SIZE * 2);
 
     gfx.fillStyle(bodyColor, 1);
-    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE - 1);
+    gfx.fillEllipse(
+      PLAYER_SIZE - facing * 3,
+      PLAYER_SIZE + 3,
+      PLAYER_SIZE * 1.45,
+      PLAYER_SIZE * 1.6,
+    );
+
+    gfx.fillStyle(bodyColor, 1);
+    gfx.fillCircle(
+      PLAYER_SIZE + facing * 5,
+      PLAYER_SIZE - 8,
+      PLAYER_SIZE * 0.56,
+    );
+
+    gfx.fillStyle(bellyColor, 0.8);
+    gfx.fillEllipse(
+      PLAYER_SIZE - facing * 7,
+      PLAYER_SIZE + 9,
+      PLAYER_SIZE * 0.64,
+      PLAYER_SIZE * 0.78,
+    );
 
     gfx.fillStyle(wingColor, 1);
-    gfx.fillEllipse(PLAYER_SIZE - facing * 6, PLAYER_SIZE + 3, 13, 17);
+    gfx.fillEllipse(PLAYER_SIZE - facing * 10, PLAYER_SIZE + 7, 17, 22);
 
-    gfx.fillStyle(outlineColor, 1);
-    gfx.strokeCircle(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE - 1);
-    gfx.fillCircle(PLAYER_SIZE, PLAYER_SIZE + 4, PLAYER_SIZE - 11);
+    gfx.lineStyle(3, outlineColor, 1);
+    gfx.strokeEllipse(
+      PLAYER_SIZE - facing * 3,
+      PLAYER_SIZE + 3,
+      PLAYER_SIZE * 1.45,
+      PLAYER_SIZE * 1.6,
+    );
+    gfx.strokeCircle(
+      PLAYER_SIZE + facing * 5,
+      PLAYER_SIZE - 8,
+      PLAYER_SIZE * 0.56,
+    );
 
     gfx.fillStyle(combColor, 1);
     gfx.fillTriangle(
-      PLAYER_SIZE - 6,
-      PLAYER_SIZE - 17,
-      PLAYER_SIZE - 1,
-      PLAYER_SIZE - 25,
-      PLAYER_SIZE + 5,
-      PLAYER_SIZE - 15,
+      PLAYER_SIZE + facing * 1,
+      PLAYER_SIZE - 27,
+      PLAYER_SIZE + facing * 6,
+      PLAYER_SIZE - 36,
+      PLAYER_SIZE + facing * 11,
+      PLAYER_SIZE - 24,
     );
 
     gfx.fillStyle(beakColor, 1);
     gfx.fillTriangle(
-      PLAYER_SIZE + facing * 8,
-      PLAYER_SIZE - 1,
-      PLAYER_SIZE + facing * 18,
-      PLAYER_SIZE + 3,
-      PLAYER_SIZE + facing * 8,
-      PLAYER_SIZE + 7,
+      PLAYER_SIZE + facing * 16,
+      PLAYER_SIZE - 9,
+      PLAYER_SIZE + facing * 30,
+      PLAYER_SIZE - 4,
+      PLAYER_SIZE + facing * 16,
+      PLAYER_SIZE + 1,
     );
 
     gfx.fillStyle(0xffffff, 1);
-    gfx.fillCircle(PLAYER_SIZE + facing * 6, PLAYER_SIZE - 7, 3.2);
+    gfx.fillCircle(PLAYER_SIZE + facing * 9, PLAYER_SIZE - 14, 3.6);
     gfx.fillStyle(eyeColor, 1);
-    gfx.fillCircle(PLAYER_SIZE + facing * 7, PLAYER_SIZE - 7, 1.3);
+    gfx.fillCircle(PLAYER_SIZE + facing * 10, PLAYER_SIZE - 14, 1.5);
 
     gfx.lineStyle(3, feetColor, 1);
     gfx.beginPath();
@@ -419,8 +450,10 @@ export class MatchScene extends Phaser.Scene {
       draw: (gfx) => {
         gfx.fillStyle(GREEN_CHICK_COLOR);
         gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
-        gfx.lineStyle(2, 0x2a7a2a, 1);
+        gfx.lineStyle(3, 0xd8ffd0, 1);
         gfx.strokeCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE - 1);
+        gfx.lineStyle(2, 0x1e7a1e, 1);
+        gfx.strokeCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE - 4);
       },
     });
 
@@ -755,18 +788,19 @@ export class MatchScene extends Phaser.Scene {
         );
         body.setPosition(spot.x, spot.y);
         body.setTint(color);
+        body.setTintFill();
         body.setScale(scale);
         body.body!.enable = false;
         body.setVisible(true);
       } else if (visibleChick) {
         const spot = FARMYARD_LAYOUT.hidingSpots[visibleChick.spotIndex]!;
         body.setPosition(spot.x, spot.y);
-        body.setTint(0xffffff);
+        body.clearTint();
         body.setScale(1);
         body.body!.enable = true;
         body.setVisible(true);
       } else if (body.visible) {
-        body.setTint(0xffffff);
+        body.clearTint();
         body.setScale(1);
         body.body!.enable = false;
         body.setVisible(false);
@@ -784,16 +818,23 @@ export class MatchScene extends Phaser.Scene {
 
       const wobble =
         Math.sin((view.elapsedMs - anticipation.startedAtMs) / 60) * 2;
-      const radius = 16 * WORLD_SCALE + wobble;
+      const progress = Math.min(
+        1,
+        (view.elapsedMs - anticipation.startedAtMs) / 700,
+      );
+      const radius = 18 * WORLD_SCALE + progress * 18 * WORLD_SCALE + wobble;
+      const alpha = 0.75 * (1 - progress * 0.35);
 
-      this.peekAnticipationLayer.lineStyle(2, 0xfff2a0, 0.45);
+      this.peekAnticipationLayer.lineStyle(4, 0xfff2a0, alpha);
       this.peekAnticipationLayer.strokeCircle(spot.x, spot.y, radius);
-      this.peekAnticipationLayer.fillStyle(0xffffff, 0.08);
+      this.peekAnticipationLayer.fillStyle(0xfff2a0, 0.18);
       this.peekAnticipationLayer.fillCircle(spot.x, spot.y, radius - 4);
-      this.peekAnticipationLayer.lineStyle(1, 0xffffff, 0.25);
+      this.peekAnticipationLayer.lineStyle(2, 0xffffff, alpha * 0.55);
       this.peekAnticipationLayer.beginPath();
       this.peekAnticipationLayer.moveTo(spot.x - radius, spot.y);
       this.peekAnticipationLayer.lineTo(spot.x + radius, spot.y);
+      this.peekAnticipationLayer.moveTo(spot.x, spot.y - radius);
+      this.peekAnticipationLayer.lineTo(spot.x, spot.y + radius);
       this.peekAnticipationLayer.strokePath();
     }
   }
@@ -815,6 +856,7 @@ export class MatchScene extends Phaser.Scene {
       this.greenChickBody.setTint(
         this.getPlayerColor(greenClaimBeat.playerIndex),
       );
+      this.greenChickBody.setTintFill();
       this.greenChickBody.setScale(scale);
       this.greenChickBody.body!.enable = false;
       this.greenChickBody.setVisible(true);
@@ -826,7 +868,7 @@ export class MatchScene extends Phaser.Scene {
 
     if (activeSpot === null) {
       if (this.greenChickBody.visible) {
-        this.greenChickBody.setTint(0xffffff);
+        this.greenChickBody.clearTint();
         this.greenChickBody.setScale(1);
         this.greenChickBody.body!.enable = false;
         this.greenChickBody.setVisible(false);
@@ -836,8 +878,8 @@ export class MatchScene extends Phaser.Scene {
 
     const spot = FARMYARD_LAYOUT.hidingSpots[activeSpot]!;
     this.greenChickBody.setPosition(spot.x, spot.y);
-    this.greenChickBody.setTint(0xffffff);
-    this.greenChickBody.setScale(1);
+    this.greenChickBody.clearTint();
+    this.greenChickBody.setScale(GREEN_CHICK_VISIBLE_SCALE);
     this.greenChickBody.body!.enable = true;
     this.greenChickBody.setVisible(true);
   }
@@ -887,17 +929,38 @@ export class MatchScene extends Phaser.Scene {
       1,
       (now - beat.startedAtMs) / GREEN_CLAIM_BEAT_DURATION_MS,
     );
-    const burstRadius = 18 * WORLD_SCALE + progress * 26 * WORLD_SCALE;
-    const burstAlpha = 0.45 * (1 - progress);
+    const burstRadius = 26 * WORLD_SCALE + progress * 54 * WORLD_SCALE;
+    const burstAlpha = 0.72 * (1 - progress);
     const playerColor = this.getPlayerColor(beat.playerIndex);
 
     this.greenClaimBurstLayer.clear();
-    this.greenClaimBurstLayer.lineStyle(4, playerColor, burstAlpha);
+    this.greenClaimBurstLayer.lineStyle(7, playerColor, burstAlpha);
     this.greenClaimBurstLayer.strokeCircle(x, y, burstRadius * scale);
-    this.greenClaimBurstLayer.lineStyle(2, 0xffffff, burstAlpha * 0.7);
+    this.greenClaimBurstLayer.lineStyle(4, 0xffffff, burstAlpha * 0.9);
     this.greenClaimBurstLayer.strokeCircle(x, y, burstRadius * 0.66 * scale);
-    this.greenClaimBurstLayer.fillStyle(playerColor, burstAlpha * 0.2);
+    this.greenClaimBurstLayer.fillStyle(playerColor, burstAlpha * 0.28);
     this.greenClaimBurstLayer.fillCircle(x, y, burstRadius * 0.42 * scale);
+
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 * i) / 8 + progress * 0.7;
+      const inner = burstRadius * 0.35 * scale;
+      const outer = burstRadius * 0.95 * scale;
+      this.greenClaimBurstLayer.lineStyle(
+        3,
+        i % 2 === 0 ? 0xffffff : playerColor,
+        burstAlpha,
+      );
+      this.greenClaimBurstLayer.beginPath();
+      this.greenClaimBurstLayer.moveTo(
+        x + Math.cos(angle) * inner,
+        y + Math.sin(angle) * inner,
+      );
+      this.greenClaimBurstLayer.lineTo(
+        x + Math.cos(angle) * outer,
+        y + Math.sin(angle) * outer,
+      );
+      this.greenClaimBurstLayer.strokePath();
+    }
   }
 
   private getPlayerColor(playerIndex: 0 | 1): number {

@@ -110,6 +110,7 @@ export class PodiumScene extends Phaser.Scene {
     const title = this.drawTitle(width);
     this.drawScores(width, height, p1Score, p2Score, p1Color, p2Color);
     const result = this.drawResult(width, height, winner);
+    this.drawCelebrationBackdrop(width, winner, playerImages);
     this.playCelebrationPop(winner, playerImages, title, result);
     this.drawPlayAgainButton(width, height);
   }
@@ -339,16 +340,57 @@ export class PodiumScene extends Phaser.Scene {
     title: Phaser.GameObjects.Text,
     result: Phaser.GameObjects.Text,
   ): void {
-    this.popIn(title, 1.08, 220, 0);
-    this.popIn(result, 1.04, 220, 40);
+    this.popIn(title, 1.22, 420, 0);
+    this.popIn(result, 1.12, 360, 60);
 
     if (winner === null) {
-      this.popIn(playerImages[0], 1.12, 260, 0);
-      this.popIn(playerImages[1], 1.12, 260, 0);
+      this.popIn(playerImages[0], 1.32, 520, 0);
+      this.popIn(playerImages[1], 1.32, 520, 0);
       return;
     }
 
-    this.popIn(playerImages[winner], 1.12, 260, 0);
+    this.popIn(playerImages[winner], 1.38, 560, 0);
+  }
+
+  private drawCelebrationBackdrop(
+    width: number,
+    winner: 0 | 1 | null,
+    playerImages: [Phaser.GameObjects.Image, Phaser.GameObjects.Image],
+  ): void {
+    const centerX = winner === null ? width / 2 : playerImages[winner].x;
+    const centerY =
+      winner === null
+        ? GOLD_BLOCK.y - PLAYER_RADIUS
+        : playerImages[winner].y - PLAYER_RADIUS;
+    const gfx = this.add.graphics();
+    gfx.setDepth(-1);
+
+    for (let i = 0; i < 14; i++) {
+      const angle = (Math.PI * 2 * i) / 14;
+      const inner = 42 * WORLD_SCALE;
+      const outer = 170 * WORLD_SCALE;
+      gfx.lineStyle(5 * WORLD_SCALE, i % 2 === 0 ? 0xfff2a0 : 0xffffff, 0.45);
+      gfx.beginPath();
+      gfx.moveTo(
+        centerX + Math.cos(angle) * inner,
+        centerY + Math.sin(angle) * inner,
+      );
+      gfx.lineTo(
+        centerX + Math.cos(angle) * outer,
+        centerY + Math.sin(angle) * outer,
+      );
+      gfx.strokePath();
+    }
+
+    for (let i = 0; i < 28; i++) {
+      const x = 70 * WORLD_SCALE + ((i * 53) % 660) * WORLD_SCALE;
+      const y = (80 + ((i * 37) % 260)) * WORLD_SCALE;
+      gfx.fillStyle(
+        i % 3 === 0 ? 0xffd700 : i % 3 === 1 ? 0xff66aa : 0x66ddff,
+        0.85,
+      );
+      gfx.fillRect(x, y, 8 * WORLD_SCALE, 12 * WORLD_SCALE);
+    }
   }
 
   private popIn(

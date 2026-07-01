@@ -23,6 +23,7 @@ import {
 } from "../audio/sfx";
 import { createWebAudioScheduler } from "../audio/web-audio";
 import { MatchPresentationFeedback } from "./MatchPresentationFeedback";
+import { generateTextureOnce } from "./textures";
 
 export type MatchSfxId = "normalClaim" | "greenChickAppear" | "greenChickClaim";
 
@@ -248,24 +249,27 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private createPlayers(): void {
-    const gfx = this.add.graphics();
+    generateTextureOnce({
+      key: playerTextureKey(1, this.p1Color),
+      width: PLAYER_SIZE * 2,
+      height: PLAYER_SIZE * 2,
+      exists: (key) => this.textures.exists(key),
+      createGraphics: () => this.add.graphics(),
+      draw: (gfx) => {
+        this.drawPlayerChickenTexture(gfx, 1, this.p1Color);
+      },
+    });
 
-    this.drawPlayerChickenTexture(gfx, 1, this.p1Color);
-    gfx.generateTexture(
-      playerTextureKey(1, this.p1Color),
-      PLAYER_SIZE * 2,
-      PLAYER_SIZE * 2,
-    );
-
-    gfx.clear();
-    this.drawPlayerChickenTexture(gfx, 2, this.p2Color);
-    gfx.generateTexture(
-      playerTextureKey(2, this.p2Color),
-      PLAYER_SIZE * 2,
-      PLAYER_SIZE * 2,
-    );
-
-    gfx.destroy();
+    generateTextureOnce({
+      key: playerTextureKey(2, this.p2Color),
+      width: PLAYER_SIZE * 2,
+      height: PLAYER_SIZE * 2,
+      exists: (key) => this.textures.exists(key),
+      createGraphics: () => this.add.graphics(),
+      draw: (gfx) => {
+        this.drawPlayerChickenTexture(gfx, 2, this.p2Color);
+      },
+    });
 
     const [p1Start, p2Start] = FARMYARD_LAYOUT.playerStartPositions;
 
@@ -394,17 +398,31 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private createChicks(): void {
-    const gfx = this.add.graphics();
-    gfx.fillStyle(CHICK_COLOR);
-    gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
-    gfx.generateTexture("chick", CHICK_SIZE * 2, CHICK_SIZE * 2);
-    gfx.clear();
-    gfx.fillStyle(GREEN_CHICK_COLOR);
-    gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
-    gfx.lineStyle(2, 0x2a7a2a, 1);
-    gfx.strokeCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE - 1);
-    gfx.generateTexture("green_chick", CHICK_SIZE * 2, CHICK_SIZE * 2);
-    gfx.destroy();
+    generateTextureOnce({
+      key: "chick",
+      width: CHICK_SIZE * 2,
+      height: CHICK_SIZE * 2,
+      exists: (key) => this.textures.exists(key),
+      createGraphics: () => this.add.graphics(),
+      draw: (gfx) => {
+        gfx.fillStyle(CHICK_COLOR);
+        gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
+      },
+    });
+
+    generateTextureOnce({
+      key: "green_chick",
+      width: CHICK_SIZE * 2,
+      height: CHICK_SIZE * 2,
+      exists: (key) => this.textures.exists(key),
+      createGraphics: () => this.add.graphics(),
+      draw: (gfx) => {
+        gfx.fillStyle(GREEN_CHICK_COLOR);
+        gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
+        gfx.lineStyle(2, 0x2a7a2a, 1);
+        gfx.strokeCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE - 1);
+      },
+    });
 
     for (let i = 0; i < NORMAL_PEEK_COUNT; i++) {
       const body = this.physics.add.sprite(0, 0, "chick");

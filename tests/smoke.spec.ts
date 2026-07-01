@@ -924,6 +924,88 @@ async function activateGreenChickForTest(
   });
 }
 
+interface GreenChickClaimRenderProbe extends GreenChickProbe {
+  called: boolean;
+}
+
+function claimGreenChickForRenderTest(
+  page: import("@playwright/test").Page,
+): Promise<GreenChickClaimRenderProbe | null> {
+  return page.evaluate(() => {
+    const game = window.__CHICKEN_OLYMPICS__;
+    if (!game) return null;
+    const scene = game.scene.getScene("MatchScene");
+    if (!scene) return null;
+    game.loop.stop();
+    const match = scene as unknown as {
+      match: {
+        greenChickState: {
+          status: string;
+          scheduledAtMs: number;
+          activeSpotIndex: number | null;
+          peekStartedAtMs: number | null;
+          claimedAtMs: number | null;
+          claimedByPlayerIndex: 0 | 1 | null;
+        };
+        matchState: { scores: [number, number]; elapsedMs: number };
+      };
+      greenClaimBeat?: { startedAtMs: number } | null;
+      greenChickBody: {
+        x: number;
+        y: number;
+        visible: boolean;
+        scaleX: number;
+        scaleY: number;
+        body: { enable: boolean } | null;
+        setPosition: (x: number, y: number) => void;
+        setVisible: (v: boolean) => void;
+      };
+      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
+      renderGreenChick: () => void;
+      p1ScoreText: { text: string };
+      p2ScoreText: { text: string };
+    };
+
+    match.match.greenChickState = {
+      status: "active",
+      scheduledAtMs: 0,
+      activeSpotIndex: 5,
+      peekStartedAtMs: match.match.matchState.elapsedMs,
+      claimedAtMs: null,
+      claimedByPlayerIndex: null,
+    };
+    match.greenChickBody.setPosition(560, 490);
+    match.greenChickBody.setVisible(true);
+    if (match.greenChickBody.body) {
+      match.greenChickBody.body.enable = true;
+    }
+
+    match.handleGreenChickClaim(0);
+
+    const beat = match.greenClaimBeat ?? null;
+    if (beat !== null) {
+      match.match.matchState.elapsedMs = beat.startedAtMs + 300;
+      match.renderGreenChick();
+    }
+
+    return {
+      called: true,
+      greenChickState: match.match.greenChickState,
+      greenChickBody: {
+        x: match.greenChickBody.x,
+        y: match.greenChickBody.y,
+        visible: match.greenChickBody.visible,
+        scaleX: match.greenChickBody.scaleX,
+        scaleY: match.greenChickBody.scaleY,
+      },
+      scores: match.match.matchState.scores,
+      p1ScoreText: match.p1ScoreText.text,
+      p2ScoreText: match.p2ScoreText.text,
+      elapsedMs: match.match.matchState.elapsedMs,
+    };
+  });
+}
+
 test("Green Chick is scheduled between 20 and 70 seconds in the 90 second match", async ({
   page,
 }) => {
@@ -973,36 +1055,16 @@ test("Green Chick renders as an extra peek and awards five points when claimed",
     })
     .toBe(3);
 
-  await activateGreenChickForTest(page);
-
-  await page.waitForTimeout(300);
-
-  const result = await page.evaluate(() => {
-    const game = window.__CHICKEN_OLYMPICS__;
-    if (!game) return null;
-    const scene = game.scene.getScene("MatchScene");
-    if (!scene) return null;
-    const match = scene as unknown as {
-      handleGreenChickClaim: (playerIndex: 0 | 1) => void;
-    };
-    match.handleGreenChickClaim(0);
-    return { called: true };
+  const afterClaim = await claimGreenChickForRenderTest(page);
+  expect(afterClaim?.called).toBe(true);
+  expect(afterClaim).toMatchObject({
+    scores: [5, 0],
+    p1ScoreText: "P1 (Blue): 5",
+    greenChickState: { status: "claimed" },
+    greenChickBody: {
+      visible: true,
+    },
   });
-
-  expect(result?.called).toBe(true);
-
-  await expect
-    .poll(() => probeGreenChick(page), { timeout: 2_000 })
-    .toMatchObject({
-      scores: [5, 0],
-      p1ScoreText: "P1 (Blue): 5",
-      greenChickState: { status: "claimed" },
-      greenChickBody: {
-        visible: true,
-      },
-    });
-
-  const afterClaim = await probeGreenChick(page);
   expect(afterClaim?.greenChickBody.scaleX).toBeGreaterThan(1.8);
   expect(afterClaim?.greenChickBody.scaleY).toBeGreaterThan(1.8);
 });

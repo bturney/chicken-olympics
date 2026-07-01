@@ -22,10 +22,9 @@ Chicken Olympics will start as a static browser game optimized for a two-player 
 
 - TypeScript: strict mode.
 - Unit tests: Vitest for the pure match engine, including timing, active peeks, green chick scheduling, scoring, and winner calculation.
-- Browser smoke flow: Playwright verifies the game loads and can move from setup through match completion to the podium ceremony without asserting detailed canvas gameplay.
 - Linting: ESLint.
 - Formatting: Prettier.
-- CI: GitHub Actions runs install, typecheck, lint, Vitest, Playwright smoke test, and Vite build.
+- CI: GitHub Actions runs install, typecheck, lint, Vitest, and Vite build. The Playwright smoke suite is currently paused for investigation (see issue #43).
 
 ## Assets and Layout
 

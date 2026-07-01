@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 import type { PlayerChickenColor } from "../src/setup/colors";
 
+test.afterEach(async ({ page }) => {
+  await page.evaluate(() => {
+    window.__CHICKEN_OLYMPICS__?.destroy(true);
+  });
+});
+
 function getSceneKey(
   page: import("@playwright/test").Page,
 ): Promise<string | null> {

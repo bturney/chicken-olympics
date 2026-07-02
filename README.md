@@ -36,19 +36,7 @@ Run the unit tests:
 npm test
 ```
 
-Run the Playwright smoke tests:
-
-```bash
-npm run test:e2e
-```
-
-On a new Linux machine, install the Playwright Firefox browser and its system dependencies first:
-
-```bash
-npm run test:e2e:setup
-```
-
-This setup command may prompt for `sudo` on Linux because browser system libraries are installed through the OS package manager.
+> The Playwright smoke suite is currently paused for investigation — see issue #43. The spec, config, and dev dependencies are still in the repo for that investigation, but it is not part of the quality gate.
 
 ## Quality Gate
 

@@ -12,10 +12,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e:setup": "playwright install --with-deps firefox",
-    "test:e2e": "playwright test",
-    "test:e2e:ci": "playwright test"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "phaser": "^4.2.0"

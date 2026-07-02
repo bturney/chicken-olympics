@@ -14,14 +14,16 @@ import {
 } from "../setup/colors";
 import { computeChickenCursorPersonality } from "./chickenCursorPersonality";
 import {
-  playSfxMoment,
   SFX_NORMAL_CHICK_CLAIM,
   SFX_GREEN_CHICK_APPEAR,
   SFX_GREEN_CHICK_CLAIM,
-  type SfxScheduler,
   type SfxMoment,
 } from "../audio/sfx";
-import { createWebAudioScheduler } from "../audio/web-audio";
+import {
+  createSceneAudioAdapter,
+  type SceneAudioAdapter,
+  type SceneAudioSource,
+} from "../audio/scene-audio";
 import { MatchPresentationFeedback } from "./MatchPresentationFeedback";
 import { generateTextureOnce } from "./textures";
 
@@ -86,9 +88,11 @@ export class MatchScene extends Phaser.Scene {
   private greenChickBody!: Phaser.Physics.Arcade.Sprite;
   private peekAnticipationLayer!: Phaser.GameObjects.Graphics;
   private greenClaimBurstLayer!: Phaser.GameObjects.Graphics;
-  private sfxScheduler: SfxScheduler = { schedule: () => {} };
-  private sfxNow: () => number = () => 0;
-  readonly playedSfx: MatchSfxId[] = [];
+  private audio!: SceneAudioAdapter<MatchSfxId>;
+
+  get playedSfx(): readonly MatchSfxId[] {
+    return this.audio.played;
+  }
   readonly claimScoreEchoes: ClaimScoreEcho[] = [];
   private greenClaimBeat: GreenClaimBeat | null = null;
   private wasd!: {
@@ -171,17 +175,13 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private initAudio(): void {
-    const sound = this.sound as Phaser.Sound.WebAudioSoundManager | null;
-    if (!sound || !sound.context) {
-      return;
-    }
-    this.sfxScheduler = createWebAudioScheduler(sound.context);
-    this.sfxNow = () => sound.context.currentTime;
+    this.audio = createSceneAudioAdapter(
+      this.sound as unknown as SceneAudioSource | null,
+    );
   }
 
   private playSfx(id: MatchSfxId): void {
-    this.playedSfx.push(id);
-    playSfxMoment(this.sfxScheduler, MATCH_SFX_MOMENTS[id], this.sfxNow());
+    this.audio.play(id, MATCH_SFX_MOMENTS[id]);
   }
 
   private handleMatchEvents(events: MatchEvent[]): void {

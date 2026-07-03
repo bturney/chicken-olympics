@@ -102,7 +102,6 @@ export class MatchScene extends Phaser.Scene {
     D: Phaser.Input.Keyboard.Key;
   };
   private arrows!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private inputDebugText!: Phaser.GameObjects.Text;
 
   constructor() {
     super("MatchScene");
@@ -679,37 +678,13 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private createInput(): void {
-    // Register WASD and the arrow keys with `enableCapture: false`. Phaser
-    // defaults to calling `event.preventDefault()` on captured keys, which
-    // suppresses the browser's default behaviour (e.g. arrow-key page scroll).
-    // On outdated Chrome on Windows 10 that preventDefault call can drop the
-    // matching keyup when the OS auto-repeats, leaving the first key stuck
-    // "down" forever and every subsequent movement key "not working". Turning
-    // capture off lets the keydown/keyup pair round-trip cleanly. The body has
-    // `overflow: hidden` so the arrow keys won't actually scroll the page.
-    this.wasd = this.input.keyboard!.addKeys("W,A,S,D", false) as {
+    this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as {
       W: Phaser.Input.Keyboard.Key;
       A: Phaser.Input.Keyboard.Key;
       S: Phaser.Input.Keyboard.Key;
       D: Phaser.Input.Keyboard.Key;
     };
-    this.arrows = this.input.keyboard!.addKeys(
-      {
-        up: Phaser.Input.Keyboard.KeyCodes.UP,
-        down: Phaser.Input.Keyboard.KeyCodes.DOWN,
-        left: Phaser.Input.Keyboard.KeyCodes.LEFT,
-        right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-      },
-      false,
-    ) as Phaser.Types.Input.Keyboard.CursorKeys;
-
-    this.inputDebugText = this.add
-      .text(20 * WORLD_SCALE, 110 * WORLD_SCALE, "", {
-        fontSize: `${14 * WORLD_SCALE}px`,
-        color: "#88ff88",
-        fontFamily: "monospace",
-      })
-      .setDepth(20);
+    this.arrows = this.input.keyboard!.createCursorKeys();
   }
 
   private handleMovement(): void {
@@ -1007,20 +982,5 @@ export class MatchScene extends Phaser.Scene {
     const p2Label = getPlayerChickenColorLabel(this.p2Color);
     this.p1ScoreText.setText(`P1 (${p1Label}): ${view.scores[0]}`);
     this.p2ScoreText.setText(`P2 (${p2Label}): ${view.scores[1]}`);
-
-    // Live keyboard-state readout. Helps the user verify on the affected
-    // laptop that all eight movement keys actually reach Phaser. If a key is
-    // stuck "down" (the suspected symptom), it will show as filled instead
-    // of dimmed.
-    const mark = (down: boolean): string => (down ? "■" : "·");
-    this.inputDebugText.setText(
-      [
-        "input",
-        `P1: W${mark(this.wasd.W.isDown)} A${mark(this.wasd.A.isDown)} ` +
-          `S${mark(this.wasd.S.isDown)} D${mark(this.wasd.D.isDown)}`,
-        `P2: ↑${mark(this.arrows.up.isDown)} ↓${mark(this.arrows.down.isDown)} ` +
-          `←${mark(this.arrows.left.isDown)} →${mark(this.arrows.right.isDown)}`,
-      ].join("\n"),
-    );
   }
 }

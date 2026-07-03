@@ -56,17 +56,6 @@ interface GreenClaimBeat {
   startedAtMs: number;
 }
 
-interface MovementInputState {
-  p1Left: boolean;
-  p1Right: boolean;
-  p1Up: boolean;
-  p1Down: boolean;
-  p2Left: boolean;
-  p2Right: boolean;
-  p2Up: boolean;
-  p2Down: boolean;
-}
-
 const GREEN_CHICK_VISIBLE_SCALE = 1.35;
 const GREEN_CLAIM_BEAT_DURATION_MS = 850;
 const GREEN_CLAIM_BEAT_PEAK_SCALE = 2.8;
@@ -106,8 +95,13 @@ export class MatchScene extends Phaser.Scene {
   }
   readonly claimScoreEchoes: ClaimScoreEcho[] = [];
   private greenClaimBeat: GreenClaimBeat | null = null;
-  private movementInput: MovementInputState = this.createEmptyMovementInput();
-  private inputCleanup: (() => void) | null = null;
+  private wasd!: {
+    W: Phaser.Input.Keyboard.Key;
+    A: Phaser.Input.Keyboard.Key;
+    S: Phaser.Input.Keyboard.Key;
+    D: Phaser.Input.Keyboard.Key;
+  };
+  private arrows!: Phaser.Types.Input.Keyboard.CursorKeys;
   private inputDebugText!: Phaser.GameObjects.Text;
 
   constructor() {
@@ -684,9 +678,29 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private createInput(): void {
-    this.movementInput = this.createEmptyMovementInput();
-    this.inputCleanup?.();
-    this.inputCleanup = this.installNativeMovementInput();
+    // Register WASD and the arrow keys with `enableCapture: false`. Phaser
+    // defaults to calling `event.preventDefault()` on captured keys, which
+    // suppresses the browser's default behaviour (e.g. arrow-key page scroll).
+    // On outdated Chrome on Windows 10 that preventDefault call can drop the
+    // matching keyup when the OS auto-repeats, leaving the first key stuck
+    // "down" forever and every subsequent movement key "not working". Turning
+    // capture off lets the keydown/keyup pair round-trip cleanly. The body has
+    // `overflow: hidden` so the arrow keys won't actually scroll the page.
+    this.wasd = this.input.keyboard!.addKeys("W,A,S,D", false) as {
+      W: Phaser.Input.Keyboard.Key;
+      A: Phaser.Input.Keyboard.Key;
+      S: Phaser.Input.Keyboard.Key;
+      D: Phaser.Input.Keyboard.Key;
+    };
+    this.arrows = this.input.keyboard!.addKeys(
+      {
+        up: Phaser.Input.Keyboard.KeyCodes.UP,
+        down: Phaser.Input.Keyboard.KeyCodes.DOWN,
+        left: Phaser.Input.Keyboard.KeyCodes.LEFT,
+        right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      },
+      false,
+    ) as Phaser.Types.Input.Keyboard.CursorKeys;
 
     this.inputDebugText = this.add
       .text(20 * WORLD_SCALE, 110 * WORLD_SCALE, "", {
@@ -697,133 +711,13 @@ export class MatchScene extends Phaser.Scene {
       .setDepth(20);
   }
 
-  private createEmptyMovementInput(): MovementInputState {
-    return {
-      p1Left: false,
-      p1Right: false,
-      p1Up: false,
-      p1Down: false,
-      p2Left: false,
-      p2Right: false,
-      p2Up: false,
-      p2Down: false,
-    };
-  }
-
-  private installNativeMovementInput(): () => void {
-    const setMovementKey = (event: KeyboardEvent, down: boolean): void => {
-      const key = this.getMovementKey(event);
-      if (key === null) return;
-
-      this.movementInput[key] = down;
-      event.preventDefault();
-    };
-
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      setMovementKey(event, true);
-    };
-    const handleKeyUp = (event: KeyboardEvent): void => {
-      setMovementKey(event, false);
-    };
-    const resetInput = (): void => {
-      this.movementInput = this.createEmptyMovementInput();
-    };
-    const handleVisibilityChange = (): void => {
-      if (document.hidden) resetInput();
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-    window.addEventListener("blur", resetInput, true);
-    document.addEventListener("visibilitychange", handleVisibilityChange, true);
-
-    const cleanup = (): void => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-      window.removeEventListener("blur", resetInput, true);
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange,
-        true,
-      );
-    };
-
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
-    return cleanup;
-  }
-
-  private getMovementKey(event: KeyboardEvent): keyof MovementInputState | null {
-    switch (event.code) {
-      case "KeyA":
-        return "p1Left";
-      case "KeyD":
-        return "p1Right";
-      case "KeyW":
-        return "p1Up";
-      case "KeyS":
-        return "p1Down";
-      case "ArrowLeft":
-        return "p2Left";
-      case "ArrowRight":
-        return "p2Right";
-      case "ArrowUp":
-        return "p2Up";
-      case "ArrowDown":
-        return "p2Down";
-    }
-
-    switch (event.key) {
-      case "a":
-      case "A":
-        return "p1Left";
-      case "d":
-      case "D":
-        return "p1Right";
-      case "w":
-      case "W":
-        return "p1Up";
-      case "s":
-      case "S":
-        return "p1Down";
-      case "ArrowLeft":
-        return "p2Left";
-      case "ArrowRight":
-        return "p2Right";
-      case "ArrowUp":
-        return "p2Up";
-      case "ArrowDown":
-        return "p2Down";
-    }
-
-    switch (event.keyCode) {
-      case Phaser.Input.Keyboard.KeyCodes.A:
-        return "p1Left";
-      case Phaser.Input.Keyboard.KeyCodes.D:
-        return "p1Right";
-      case Phaser.Input.Keyboard.KeyCodes.W:
-        return "p1Up";
-      case Phaser.Input.Keyboard.KeyCodes.S:
-        return "p1Down";
-      case Phaser.Input.Keyboard.KeyCodes.LEFT:
-        return "p2Left";
-      case Phaser.Input.Keyboard.KeyCodes.RIGHT:
-        return "p2Right";
-      case Phaser.Input.Keyboard.KeyCodes.UP:
-        return "p2Up";
-      case Phaser.Input.Keyboard.KeyCodes.DOWN:
-        return "p2Down";
-      default:
-        return null;
-    }
-  }
-
   private handleMovement(): void {
     const p1Velocity = computeMoveVelocity(
       {
-        left: this.movementInput.p1Left,
-        right: this.movementInput.p1Right,
-        up: this.movementInput.p1Up,
-        down: this.movementInput.p1Down,
+        left: this.wasd.A.isDown,
+        right: this.wasd.D.isDown,
+        up: this.wasd.W.isDown,
+        down: this.wasd.S.isDown,
       },
       MOVE_SPEED,
     );
@@ -831,10 +725,10 @@ export class MatchScene extends Phaser.Scene {
 
     const p2Velocity = computeMoveVelocity(
       {
-        left: this.movementInput.p2Left,
-        right: this.movementInput.p2Right,
-        up: this.movementInput.p2Up,
-        down: this.movementInput.p2Down,
+        left: this.arrows.left.isDown,
+        right: this.arrows.right.isDown,
+        up: this.arrows.up.isDown,
+        down: this.arrows.down.isDown,
       },
       MOVE_SPEED,
     );
@@ -1121,10 +1015,10 @@ export class MatchScene extends Phaser.Scene {
     this.inputDebugText.setText(
       [
         "input",
-        `P1: W${mark(this.movementInput.p1Up)} A${mark(this.movementInput.p1Left)} ` +
-          `S${mark(this.movementInput.p1Down)} D${mark(this.movementInput.p1Right)}`,
-        `P2: ↑${mark(this.movementInput.p2Up)} ↓${mark(this.movementInput.p2Down)} ` +
-          `←${mark(this.movementInput.p2Left)} →${mark(this.movementInput.p2Right)}`,
+        `P1: W${mark(this.wasd.W.isDown)} A${mark(this.wasd.A.isDown)} ` +
+          `S${mark(this.wasd.S.isDown)} D${mark(this.wasd.D.isDown)}`,
+        `P2: ↑${mark(this.arrows.up.isDown)} ↓${mark(this.arrows.down.isDown)} ` +
+          `←${mark(this.arrows.left.isDown)} →${mark(this.arrows.right.isDown)}`,
       ].join("\n"),
     );
   }

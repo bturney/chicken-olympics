@@ -139,6 +139,7 @@ export class MatchScene extends Phaser.Scene {
     this.createPeekAnticipationLayer();
     this.createGreenClaimBurstLayer();
     this.createInput();
+    this.updateHUD();
     this.createOverlaps();
     this.drawBounds();
 
@@ -246,8 +247,6 @@ export class MatchScene extends Phaser.Scene {
         color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
       })
       .setOrigin(1, 0);
-
-    this.updateHUD();
   }
 
   private createPlayers(): void {

@@ -36,8 +36,6 @@ Run the unit tests:
 npm test
 ```
 
-> The Playwright smoke suite is currently paused for investigation — see issue #43. The spec, config, and dev dependencies are still in the repo for that investigation, but it is not part of the quality gate.
-
 ## Quality Gate
 
 Run these before opening or merging a PR:

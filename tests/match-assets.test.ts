@@ -46,9 +46,7 @@ describe("match slice asset registration", () => {
   it("provides stable presentation keys for match slice chick assets", () => {
     expect(MATCH_SLICE_ASSET_KEYS.normalChick).toBe("match.chick.normal");
     expect(MATCH_SLICE_ASSET_KEYS.greenChick).toBe("match.chick.green");
-    expect(MATCH_SLICE_ASSET_KEYS.normalClaimSfx).toBe(
-      "match.sfx.normalClaim",
-    );
+    expect(MATCH_SLICE_ASSET_KEYS.normalClaimSfx).toBe("match.sfx.normalClaim");
   });
 
   it("preloads registered runtime image and audio assets through stable keys", () => {

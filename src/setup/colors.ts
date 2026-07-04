@@ -50,6 +50,7 @@ export function availableColors(
 }
 
 export function canStartMatch(selection: SetupSelection): boolean {
-  if (selection.p1 === null || selection.p2 === null) return false;
+  if (selection.p1 === null) return false;
+  if (selection.p2 === null) return true;
   return selection.p1 !== selection.p2;
 }

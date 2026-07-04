@@ -131,10 +131,10 @@ describe("canStartMatch", () => {
     expect(canStartMatch(selection)).toBe(false);
   });
 
-  it("returns false when only player 1 has chosen a color", () => {
+  it("returns true when only player 1 has chosen a color (solo local match)", () => {
     const selection: SetupSelection = { p1: "blue", p2: null };
 
-    expect(canStartMatch(selection)).toBe(false);
+    expect(canStartMatch(selection)).toBe(true);
   });
 
   it("returns false when only player 2 has chosen a color", () => {

@@ -9,6 +9,7 @@ import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
 import { computeMoveVelocity } from "../match/movement";
 import {
   getPlayerChickenColorLabel,
+  getPlayerChickenCssHex,
   getPlayerChickenHex,
   type PlayerChickenColor,
 } from "../setup/colors";
@@ -62,10 +63,6 @@ const GREEN_CLAIM_BEAT_PEAK_SCALE = 2.8;
 
 function playerTextureKey(player: 1 | 2, color: PlayerChickenColor): string {
   return `p${player}_chicken_${color}`;
-}
-
-function hexToCssHex(value: number): string {
-  return "#" + value.toString(16).padStart(6, "0");
 }
 
 export class MatchScene extends Phaser.Scene {
@@ -236,13 +233,13 @@ export class MatchScene extends Phaser.Scene {
 
     this.p1ScoreText = this.add.text(20 * WORLD_SCALE, 10 * WORLD_SCALE, "", {
       fontSize: `${18 * WORLD_SCALE}px`,
-      color: hexToCssHex(getPlayerChickenHex(this.p1Color)),
+      color: getPlayerChickenCssHex(this.p1Color),
     });
 
     this.p2ScoreText = this.add
       .text(width - 20 * WORLD_SCALE, 10 * WORLD_SCALE, "", {
         fontSize: `${18 * WORLD_SCALE}px`,
-        color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
+        color: getPlayerChickenCssHex(this.p2Color),
       })
       .setOrigin(1, 0);
 
@@ -294,7 +291,7 @@ export class MatchScene extends Phaser.Scene {
     this.p1Label = this.add
       .text(p1Start.x, p1Start.y + PLAYER_SIZE + 4 * WORLD_SCALE, "P1", {
         fontSize: `${14 * WORLD_SCALE}px`,
-        color: hexToCssHex(getPlayerChickenHex(this.p1Color)),
+        color: getPlayerChickenCssHex(this.p1Color),
       })
       .setOrigin(0.5);
     this.p1Label.setDepth(3);
@@ -319,7 +316,7 @@ export class MatchScene extends Phaser.Scene {
     this.p2Label = this.add
       .text(p2Start.x, p2Start.y + PLAYER_SIZE + 4 * WORLD_SCALE, "P2", {
         fontSize: `${14 * WORLD_SCALE}px`,
-        color: hexToCssHex(getPlayerChickenHex(this.p2Color)),
+        color: getPlayerChickenCssHex(this.p2Color),
       })
       .setOrigin(0.5);
     this.p2Label.setDepth(3);
@@ -522,7 +519,9 @@ export class MatchScene extends Phaser.Scene {
     const echo = this.add
       .text(spot.x, spot.y - 18 * WORLD_SCALE, `+${points}`, {
         fontSize: `${18 * WORLD_SCALE}px`,
-        color: hexToCssHex(this.getPlayerColor(playerIndex)),
+        color: getPlayerChickenCssHex(
+          playerIndex === 0 ? this.p1Color : this.p2Color,
+        ),
         stroke: "#000000",
         strokeThickness: 3,
       })

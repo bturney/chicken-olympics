@@ -4,6 +4,7 @@ import {
   availableColors,
   canStartMatch,
   getPlayerChickenColorLabel,
+  getPlayerChickenCssHex,
   getPlayerChickenHex,
   type PlayerChickenColor,
   type SetupSelection,
@@ -43,6 +44,21 @@ describe("getPlayerChickenHex", () => {
     ]);
     expect(reserved.has(0x44aa44)).toBe(false);
     expect(reserved.has(0xffdd44)).toBe(false);
+  });
+});
+
+describe("getPlayerChickenCssHex", () => {
+  it("returns a CSS hex string for every Player Chicken color", () => {
+    const expected: Record<PlayerChickenColor, string> = {
+      blue: "#4488ff",
+      red: "#ff4444",
+      purple: "#aa44ff",
+      orange: "#ff8844",
+    };
+
+    for (const color of PLAYER_CHICKEN_COLORS) {
+      expect(getPlayerChickenCssHex(color)).toBe(expected[color]);
+    }
   });
 });
 

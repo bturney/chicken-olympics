@@ -18,6 +18,10 @@ export function getPlayerChickenHex(color: PlayerChickenColor): number {
   return PLAYER_CHICKEN_HEX[color];
 }
 
+export function getPlayerChickenCssHex(color: PlayerChickenColor): string {
+  return "#" + getPlayerChickenHex(color).toString(16).padStart(6, "0");
+}
+
 export function getPlayerChickenColorLabel(color: PlayerChickenColor): string {
   switch (color) {
     case "blue":

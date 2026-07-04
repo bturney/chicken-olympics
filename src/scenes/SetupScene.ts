@@ -4,7 +4,7 @@ import {
   availableColors,
   canStartMatch,
   getPlayerChickenColorLabel,
-  getPlayerChickenHex,
+  getPlayerChickenCssHex,
   type PlayerChickenColor,
   type SetupSelection,
 } from "../setup/colors";
@@ -83,14 +83,13 @@ export class SetupScene extends Phaser.Scene {
     for (let i = 0; i < PLAYER_CHICKEN_COLORS.length; i++) {
       const color = PLAYER_CHICKEN_COLORS[i]!;
       const x = SWATCH_X_POSITIONS[i]!;
-      const hex = getPlayerChickenHex(color);
       const label = getPlayerChickenColorLabel(color);
 
       const text = this.add
         .text(x, y, label, {
           fontSize: `${18 * WORLD_SCALE}px`,
           color: "#ffffff",
-          backgroundColor: "#" + hex.toString(16).padStart(6, "0"),
+          backgroundColor: getPlayerChickenCssHex(color),
           padding: { x: 16 * WORLD_SCALE, y: 8 * WORLD_SCALE },
         })
         .setOrigin(0.5)

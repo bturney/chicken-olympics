@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import {
   getPlayerChickenColorLabel,
+  getPlayerChickenCssHex,
   getPlayerChickenHex,
   type PlayerChickenColor,
 } from "../setup/colors";
@@ -291,7 +292,7 @@ export class PodiumScene extends Phaser.Scene {
         `Player 1 (${getPlayerChickenColorLabel(p1Color)}): ${p1Score}`,
         {
           fontSize: `${20 * WORLD_SCALE}px`,
-          color: hexToCssHex(getPlayerChickenHex(p1Color)),
+          color: getPlayerChickenCssHex(p1Color),
         },
       )
       .setOrigin(0.5);
@@ -303,7 +304,7 @@ export class PodiumScene extends Phaser.Scene {
         `Player 2 (${getPlayerChickenColorLabel(p2Color)}): ${p2Score}`,
         {
           fontSize: `${20 * WORLD_SCALE}px`,
-          color: hexToCssHex(getPlayerChickenHex(p2Color)),
+          color: getPlayerChickenCssHex(p2Color),
         },
       )
       .setOrigin(0.5);
@@ -425,8 +426,4 @@ export class PodiumScene extends Phaser.Scene {
       this.scene.start("SetupScene");
     });
   }
-}
-
-function hexToCssHex(value: number): string {
-  return "#" + value.toString(16).padStart(6, "0");
 }

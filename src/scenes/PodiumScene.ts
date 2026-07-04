@@ -13,12 +13,14 @@ import {
   type SceneAudioSource,
 } from "../audio/scene-audio";
 import { WORLD_SCALE } from "../match/layout";
+import { rankPlayerSlotsForPodium } from "../match/playerSlots";
 
 type PodiumSfxId = "podiumFanfare";
 
 interface PodiumData {
-  scores?: [number, number];
-  winner?: 0 | 1 | null;
+  scores?: number[];
+  winner?: number | null;
+  playerColors?: PlayerChickenColor[];
   p1Color?: PlayerChickenColor;
   p2Color?: PlayerChickenColor;
 }
@@ -102,23 +104,47 @@ export class PodiumScene extends Phaser.Scene {
 
   create(data: PodiumData): void {
     const { width, height } = this.scale;
-    const [p1Score, p2Score] = data?.scores ?? [0, 0];
-    const winner: 0 | 1 | null = data?.winner ?? null;
+    const scores = data?.scores ?? [0, 0];
     const p1Color: PlayerChickenColor = data?.p1Color ?? "blue";
     const p2Color: PlayerChickenColor = data?.p2Color ?? "red";
+    const playerColors = data?.playerColors ?? [p1Color, p2Color];
+    const placements = rankPlayerSlotsForPodium(scores);
+    const winner = data?.winner ?? this.getWinnerFromPlacements(placements);
 
     this.initAudio();
     this.playSfx("podiumFanfare");
 
     this.drawPodiumBlocks();
     this.drawGround(width, height);
-    const playerImages = this.placePlayers(winner, p1Color, p2Color);
+    const playerImages = this.placePlayers(
+      winner === 0 || winner === 1 ? winner : null,
+      p1Color,
+      p2Color,
+    );
     const title = this.drawTitle(width);
-    this.drawScores(width, height, p1Score, p2Score, p1Color, p2Color);
+    this.drawScores(width, height, scores, playerColors);
     const result = this.drawResult(width, height, winner);
-    this.drawCelebrationBackdrop(width, winner, playerImages);
-    this.playCelebrationPop(winner, playerImages, title, result);
+    this.drawCelebrationBackdrop(
+      width,
+      winner === 0 || winner === 1 ? winner : null,
+      playerImages,
+    );
+    this.playCelebrationPop(
+      winner === 0 || winner === 1 ? winner : null,
+      playerImages,
+      title,
+      result,
+    );
     this.drawPlayAgainButton(width, height);
+  }
+
+  private getWinnerFromPlacements(
+    placements: ReturnType<typeof rankPlayerSlotsForPodium>,
+  ): number | null {
+    const [first, second] = placements;
+    if (!first) return null;
+    if (second && second.score === first.score) return null;
+    return first.playerIndex;
   }
 
   private initAudio(): void {
@@ -280,46 +306,33 @@ export class PodiumScene extends Phaser.Scene {
   private drawScores(
     width: number,
     height: number,
-    p1Score: number,
-    p2Score: number,
-    p1Color: PlayerChickenColor,
-    p2Color: PlayerChickenColor,
+    scores: readonly number[],
+    playerColors: readonly PlayerChickenColor[],
   ): void {
-    this.add
-      .text(
-        width / 2,
-        height - 135 * WORLD_SCALE,
-        `Player 1 (${getPlayerChickenColorLabel(p1Color)}): ${p1Score}`,
-        {
-          fontSize: `${20 * WORLD_SCALE}px`,
-          color: getPlayerChickenCssHex(p1Color),
-        },
-      )
-      .setOrigin(0.5);
-
-    this.add
-      .text(
-        width / 2,
-        height - 100 * WORLD_SCALE,
-        `Player 2 (${getPlayerChickenColorLabel(p2Color)}): ${p2Score}`,
-        {
-          fontSize: `${20 * WORLD_SCALE}px`,
-          color: getPlayerChickenCssHex(p2Color),
-        },
-      )
-      .setOrigin(0.5);
+    for (let playerIndex = 0; playerIndex < scores.length; playerIndex++) {
+      const color = playerColors[playerIndex] ?? playerColors[0] ?? "blue";
+      this.add
+        .text(
+          width / 2,
+          height - (135 - playerIndex * 28) * WORLD_SCALE,
+          `Player ${playerIndex + 1} (${getPlayerChickenColorLabel(color)}): ${scores[playerIndex] ?? 0}`,
+          {
+            fontSize: `${20 * WORLD_SCALE}px`,
+            color: getPlayerChickenCssHex(color),
+          },
+        )
+        .setOrigin(0.5);
+    }
   }
 
   private drawResult(
     width: number,
     height: number,
-    winner: 0 | 1 | null,
+    winner: number | null,
   ): Phaser.GameObjects.Text {
     let result: string;
-    if (winner === 0) {
-      result = "Player 1 Wins!";
-    } else if (winner === 1) {
-      result = "Player 2 Wins!";
+    if (winner !== null) {
+      result = `Player ${winner + 1} Wins!`;
     } else {
       result = "It's a Tie!";
     }

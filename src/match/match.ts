@@ -16,11 +16,14 @@ import {
   tickPeekState,
   type GreenChickState,
   type MatchState,
+  type PlayerIndex,
+  type PlayerSlotCount,
   type PeekState,
 } from "./rules";
 
 export interface MatchOptions {
   durationMs?: number;
+  playerSlotCount?: PlayerSlotCount;
   spotCount: number;
   random?: () => number;
 }
@@ -41,11 +44,11 @@ export interface VisiblePeekAnticipation {
 }
 
 export interface MatchView {
-  scores: [number, number];
+  scores: number[];
   elapsedMs: number;
   remainingMs: number;
   complete: boolean;
-  winner: 0 | 1 | null;
+  winner: number | null;
   normalChicks: VisibleNormalChick[];
   peekAnticipations: VisiblePeekAnticipation[];
   greenChick: VisibleGreenChick | null;
@@ -56,10 +59,10 @@ export type MatchEvent =
       type: "normalChickClaimed";
       slotIndex: number;
       spotIndex: number;
-      playerIndex: 0 | 1;
+      playerIndex: PlayerIndex;
     }
   | { type: "greenChickAppeared"; spotIndex: number }
-  | { type: "greenChickClaimed"; spotIndex: number; playerIndex: 0 | 1 }
+  | { type: "greenChickClaimed"; spotIndex: number; playerIndex: PlayerIndex }
   | { type: "greenChickMissed"; spotIndex: number };
 
 export class Match {
@@ -70,7 +73,10 @@ export class Match {
   private readonly spotCount: number;
 
   constructor(options: MatchOptions) {
-    this.matchState = createMatchState({ durationMs: options.durationMs });
+    this.matchState = createMatchState({
+      durationMs: options.durationMs,
+      playerSlotCount: options.playerSlotCount,
+    });
     this.peekState = createPeekState(0);
     this.random = options.random ?? Math.random;
     this.spotCount = options.spotCount;
@@ -118,7 +124,7 @@ export class Match {
     return [];
   }
 
-  claim(spotIndex: number, playerIndex: 0 | 1): MatchEvent[] {
+  claim(spotIndex: number, playerIndex: PlayerIndex): MatchEvent[] {
     const now = this.matchState.elapsedMs;
     const greenSpot = getActiveGreenChickSpotIndex(this.greenChickState, now);
     if (greenSpot === spotIndex) {

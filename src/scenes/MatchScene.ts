@@ -56,7 +56,7 @@ interface ClaimScoreEcho {
 
 interface GreenClaimBeat {
   spotIndex: number;
-  playerIndex: 0 | 1;
+  playerIndex: number;
   startedAtMs: number;
 }
 
@@ -167,6 +167,7 @@ export class MatchScene extends Phaser.Scene {
         this.scene.start("PodiumScene", {
           scores: view.scores,
           winner: view.winner,
+          playerColors: [this.p1Color, this.p2Color],
           p1Color: this.p1Color,
           p2Color: this.p2Color,
         });
@@ -499,7 +500,7 @@ export class MatchScene extends Phaser.Scene {
 
   private spawnClaimScoreEcho(
     spotIndex: number,
-    playerIndex: 0 | 1,
+    playerIndex: number,
     points: number,
   ): void {
     const spot = FARMYARD_LAYOUT.hidingSpots[spotIndex];
@@ -532,7 +533,7 @@ export class MatchScene extends Phaser.Scene {
     });
   }
 
-  private bumpScoreText(playerIndex: 0 | 1): void {
+  private bumpScoreText(playerIndex: number): void {
     const scoreText = playerIndex === 0 ? this.p1ScoreText : this.p2ScoreText;
     this.tweens.killTweensOf(scoreText);
     scoreText.setScale(1.12);
@@ -872,7 +873,7 @@ export class MatchScene extends Phaser.Scene {
 
   private startGreenClaimBeat(
     spotIndex: number,
-    playerIndex: 0 | 1,
+    playerIndex: number,
     now: number,
   ): void {
     this.greenClaimBeat = { spotIndex, playerIndex, startedAtMs: now };
@@ -949,7 +950,7 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
-  private getPlayerColor(playerIndex: 0 | 1): number {
+  private getPlayerColor(playerIndex: number): number {
     return getPlayerChickenHex(playerIndex === 0 ? this.p1Color : this.p2Color);
   }
 

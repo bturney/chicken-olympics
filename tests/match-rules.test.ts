@@ -976,7 +976,9 @@ describe("attemptClaim", () => {
       state = result.peekState;
     }
 
-    expect(match.scores[0] + match.scores[1]).toBeGreaterThanOrEqual(1);
+    expect(
+      match.scores.reduce((total, score) => total + score, 0),
+    ).toBeGreaterThanOrEqual(1);
   });
 });
 

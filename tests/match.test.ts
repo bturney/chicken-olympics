@@ -24,6 +24,16 @@ describe("Match", () => {
     expect(view.normalChicks).toHaveLength(0);
   });
 
+  it("can represent four active player slots with independent scores", () => {
+    const match = new Match({
+      durationMs: 5_000,
+      spotCount: 6,
+      playerSlotCount: 4,
+    });
+
+    expect(match.view().scores).toEqual([0, 0, 0, 0]);
+  });
+
   it("advances time and completes the Match at its duration", () => {
     const match = new Match({ durationMs: 5_000, spotCount: 6 });
 
@@ -38,6 +48,26 @@ describe("Match", () => {
       remainingMs: 0,
       complete: true,
       winner: null,
+    });
+  });
+
+  it("reports the highest scoring player slot as the winner across four slots", () => {
+    const match = new Match({
+      durationMs: 5_000,
+      spotCount: 6,
+      playerSlotCount: 4,
+      random: constantRandom(0),
+    });
+
+    match.advance(0);
+    const activeSpot = match.view().normalChicks[0]?.spotIndex ?? 0;
+    match.claim(activeSpot, 3);
+    match.advance(5_000);
+
+    expect(match.view()).toMatchObject({
+      complete: true,
+      scores: [0, 0, 0, 1],
+      winner: 3,
     });
   });
 
@@ -107,6 +137,29 @@ describe("Match", () => {
     expect(
       match.view().normalChicks.map((chick) => chick.spotIndex),
     ).not.toContain(activeSpot);
+  });
+
+  it("lets player slot 4 claim a visible normal chick for one point", () => {
+    const match = new Match({
+      durationMs: 5_000,
+      spotCount: 6,
+      playerSlotCount: 4,
+      random: constantRandom(0),
+    });
+    match.advance(0);
+
+    const activeSpot = match.view().normalChicks[0]?.spotIndex ?? 0;
+    const events = match.claim(activeSpot, 3);
+
+    expect(events).toEqual([
+      {
+        type: "normalChickClaimed",
+        slotIndex: 0,
+        spotIndex: 0,
+        playerIndex: 3,
+      },
+    ]);
+    expect(match.view().scores).toEqual([0, 0, 0, 1]);
   });
 
   it("does not immediately refill a just-claimed hiding spot when another free spot exists", () => {

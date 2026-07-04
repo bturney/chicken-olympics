@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Match } from "../src/match/match";
+import { FARMYARD_LAYOUT } from "../src/match/layout";
 import {
+  NORMAL_PEEK_COUNT,
   NORMAL_REFILL_MIN_MS,
   PEEK_ANTICIPATION_DURATION_MS,
 } from "../src/match/rules";
@@ -83,6 +85,20 @@ describe("Match", () => {
     const normalChicks = match.view().normalChicks;
     expect(normalChicks).toHaveLength(3);
     expect(new Set(normalChicks.map((chick) => chick.spotIndex)).size).toBe(3);
+  });
+
+  it("keeps simultaneous normal peeks unchanged with the expanded Farmyard Stadium layout", () => {
+    const match = new Match({
+      durationMs: 5_000,
+      spotCount: FARMYARD_LAYOUT.hidingSpots.length,
+      random: constantRandom(0.999),
+    });
+
+    match.advance(0);
+
+    const normalChicks = match.view().normalChicks;
+    expect(normalChicks).toHaveLength(NORMAL_PEEK_COUNT);
+    expect(normalChicks.some((chick) => chick.spotIndex >= 6)).toBe(true);
   });
 
   it("exposes a brief Peek Anticipation before refilling normal chicks", () => {

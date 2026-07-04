@@ -84,5 +84,29 @@ export const FARMYARD_LAYOUT: FarmyardLayout = {
       type: "nest-box",
       name: "Center Nest Box",
     },
+    {
+      x: 90 * WORLD_SCALE,
+      y: 320 * WORLD_SCALE,
+      type: "fence",
+      name: "West Fence",
+    },
+    {
+      x: 720 * WORLD_SCALE,
+      y: 360 * WORLD_SCALE,
+      type: "flower-pot",
+      name: "East Flower Pot",
+    },
+    {
+      x: 360 * WORLD_SCALE,
+      y: 540 * WORLD_SCALE,
+      type: "hay-bale",
+      name: "South Hay Bale",
+    },
+    {
+      x: 540 * WORLD_SCALE,
+      y: 270 * WORLD_SCALE,
+      type: "nest-box",
+      name: "Northeast Nest Box",
+    },
   ],
 };

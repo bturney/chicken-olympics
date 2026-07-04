@@ -9,8 +9,20 @@ A timed round of Chicken Olympics where players compete to claim the most chicks
 _Avoid_: Game, session, race
 
 **Local Match**:
-A match played by multiple players on the same device.
-_Avoid_: Online match, room
+A match played on one device with up to four player slots, where unused slots may be filled by bot chickens so one human can play solo.
+_Avoid_: Online match, room, practice mode, four-human keyboard match
+
+**Solo Local Match**:
+A local match with one human-controlled player slot and one or more bot chickens, still played as a competition with claims, scores, and a winner.
+_Avoid_: Practice mode, high-score mode, single-player mode
+
+**Player Slot**:
+A participant position in a local match, controlled either by a human player or a bot chicken.
+_Avoid_: Player count, controller, seat
+
+**Keyboard-Friendly Human Count**:
+The number of human-controlled player slots that can comfortably share one keyboard in a local match; currently two, with additional player slots filled by bot chickens unless another input approach is added.
+_Avoid_: Four players on one keyboard, keyboard crowding, ghosting-prone controls
 
 **Farmyard Stadium**:
 The Chicken Olympics arena: an Olympic-style stadium whose field is a farmyard filled with hiding spots.
@@ -32,9 +44,17 @@ _Avoid_: Avatar, character, chicken color
 A player's movable on-screen chicken used to claim peeking chicks by touching them during a local match.
 _Avoid_: Mouse cursor, pointer, selector
 
+**Bot Chicken**:
+A cute, visibly mechanical chicken cursor that controls a player slot automatically during a local match, behaving human-ish enough to make solo matches feel lively and winnable rather than optimal.
+_Avoid_: NPC, AI opponent, perfect computer player, enemy robot
+
 **Chicken Cursor Personality**:
 Lightweight visual character in a chicken cursor's movement, such as bobbing, squash, or tiny footstep motion, without changing movement speed, acceleration, bounds, or claiming rules.
 _Avoid_: Movement tuning, collision, physics
+
+**Chicken Cursor Responsiveness**:
+How quick and comfortable a chicken cursor feels when chasing chicks across the Farmyard Stadium, adjusted as match feel tuning without adding new claiming rules or movement abilities.
+_Avoid_: Dash, stamina, acceleration system, power-up
 
 **Chick**:
 A yellow baby chicken that hides, peeks out temporarily, and can be claimed by a player chicken.
@@ -43,6 +63,10 @@ _Avoid_: Target, enemy, item
 **Hiding Spot**:
 A visible place on the playfield where a chick may peek out during a match.
 _Avoid_: Spawn point, hole, target location
+
+**Hiding Spot Variety**:
+The number and distribution of possible hiding spots in the Farmyard Stadium, which can increase without necessarily increasing simultaneous peeks.
+_Avoid_: More active chicks, spawn rate, difficulty
 
 **Peek**:
 The temporary moment when a chick is visible and available to be claimed.
@@ -53,7 +77,7 @@ A subtle mostly-visual wiggle, rustle, or similar cue from a hiding spot shortly
 _Avoid_: Warning, spawn telegraph, alert
 
 **Peek Pressure**:
-The amount of active chick-chasing demand in a match, shaped by how many chicks are peeking, how many hiding spots exist, how long peeks last, and how quickly replacements happen.
+The amount of active chick-chasing demand in a match, shaped mainly by how many chicks are peeking at once, how long peeks last, and how quickly replacements happen.
 _Avoid_: Spawn rate, chaos, difficulty
 
 **Claim**:

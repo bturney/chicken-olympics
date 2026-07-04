@@ -2,20 +2,25 @@ import { FARMYARD_LAYOUT } from "./layout";
 
 export interface MatchOptions {
   durationMs?: number;
+  playerSlotCount?: PlayerSlotCount;
 }
+
+export type PlayerSlotCount = 2 | 3 | 4;
+export type PlayerIndex = 0 | 1 | 2 | 3;
 
 export interface MatchState {
   durationMs: number;
-  scores: [number, number];
+  scores: number[];
   elapsedMs: number;
 }
 
 export const PRODUCTION_MATCH_DURATION_MS = 90_000;
 
 export function createMatchState(options: MatchOptions = {}): MatchState {
+  const playerSlotCount = options.playerSlotCount ?? 2;
   return {
     durationMs: options.durationMs ?? PRODUCTION_MATCH_DURATION_MS,
-    scores: [0, 0],
+    scores: Array.from({ length: playerSlotCount }, () => 0),
     elapsedMs: 0,
   };
 }
@@ -37,19 +42,31 @@ export function getRemainingMs(state: MatchState): number {
 
 export function addScore(
   state: MatchState,
-  playerIndex: 0 | 1,
+  playerIndex: PlayerIndex,
   points: number,
 ): MatchState {
-  const scores: [number, number] = [...state.scores];
-  scores[playerIndex] += points;
+  if (playerIndex < 0 || playerIndex >= state.scores.length) return state;
+  const scores = [...state.scores];
+  scores[playerIndex] = (scores[playerIndex] ?? 0) + points;
   return { ...state, scores };
 }
 
-export function getWinner(state: MatchState): 0 | 1 | null {
-  const [p1, p2] = state.scores;
-  if (p1 > p2) return 0;
-  if (p2 > p1) return 1;
-  return null;
+export function getWinner(state: MatchState): number | null {
+  let winner: number | null = null;
+  let winningScore = Number.NEGATIVE_INFINITY;
+  let tied = false;
+  for (let i = 0; i < state.scores.length; i++) {
+    const score = state.scores[i]!;
+    if (score > winningScore) {
+      winner = i;
+      winningScore = score;
+      tied = false;
+    } else if (score === winningScore) {
+      tied = true;
+    }
+  }
+  if (tied) return null;
+  return winner;
 }
 
 export const NORMAL_PEEK_COUNT = 3;
@@ -72,7 +89,7 @@ export interface GreenChickState {
   activeSpotIndex: number | null;
   peekStartedAtMs: number | null;
   claimedAtMs: number | null;
-  claimedByPlayerIndex: 0 | 1 | null;
+  claimedByPlayerIndex: PlayerIndex | null;
 }
 
 export function createGreenChickState(
@@ -215,7 +232,7 @@ export function attemptGreenChickClaim(
   matchState: MatchState,
   greenChickState: GreenChickState,
   spotIndex: number,
-  playerIndex: 0 | 1,
+  playerIndex: PlayerIndex,
   currentTimeMs: number,
 ): GreenChickClaimResult {
   if (
@@ -565,7 +582,7 @@ export const CLAIM_POP_PEAK_SCALE = 1.4;
 export interface ClaimAnimation {
   slotIndex: number;
   spotIndex: number;
-  playerIndex: 0 | 1;
+  playerIndex: PlayerIndex;
   startedAtMs: number;
   durationMs: number;
 }
@@ -582,7 +599,7 @@ export function startClaimAnimation(
   state: ClaimAnimationState,
   slotIndex: number,
   spotIndex: number,
-  playerIndex: 0 | 1,
+  playerIndex: PlayerIndex,
   now: number,
   durationMs: number = CLAIM_FEEDBACK_DURATION_MS,
 ): ClaimAnimationState {
@@ -640,7 +657,7 @@ export function attemptClaim(
   matchState: MatchState,
   peekState: PeekState,
   spotIndex: number,
-  playerIndex: 0 | 1,
+  playerIndex: PlayerIndex,
   currentTimeMs: number,
   random: () => number,
 ): ClaimResult {

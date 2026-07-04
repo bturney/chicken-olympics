@@ -5,6 +5,7 @@ import {
   tickClaimAnimations,
   type ClaimAnimation,
   type ClaimAnimationState,
+  type PlayerIndex,
 } from "../match/rules";
 
 export class MatchPresentationFeedback {
@@ -18,7 +19,7 @@ export class MatchPresentationFeedback {
   startClaimAnimation(
     slotIndex: number,
     spotIndex: number,
-    playerIndex: 0 | 1,
+    playerIndex: PlayerIndex,
     now: number,
   ): void {
     this.claimAnimationState = startClaimAnimation(

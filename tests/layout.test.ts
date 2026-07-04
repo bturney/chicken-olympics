@@ -56,8 +56,8 @@ describe("FarmyardLayout", () => {
     expect(FARMYARD_LAYOUT.playerSpeed).toBeGreaterThan(0);
   });
 
-  it("has at least four hiding spots to support three normal Chicks plus the Green Chick extra peek", () => {
-    expect(FARMYARD_LAYOUT.hidingSpots.length).toBeGreaterThanOrEqual(4);
+  it("has more than the original six hiding spots for Farmyard Stadium variety", () => {
+    expect(FARMYARD_LAYOUT.hidingSpots.length).toBeGreaterThan(6);
   });
 
   it("describes every hiding spot with a valid type from the canonical set", () => {

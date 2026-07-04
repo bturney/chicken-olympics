@@ -7,6 +7,12 @@ import {
 } from "../match/rules";
 import { Match, type MatchEvent } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
+import {
+  createBotChickenController,
+  tickBotChickenController,
+  type BotChickenController,
+  type BotChickenTarget,
+} from "../match/botChickenController";
 import { computeMoveVelocity } from "../match/movement";
 import {
   getPlayerChickenColorLabel,
@@ -80,6 +86,7 @@ export class MatchScene extends Phaser.Scene {
   private p2Color: PlayerChickenColor = "red";
   private playerSlotCount: PlayerSlotCount = 2;
   private botSlots: number[] = [];
+  private botControllers = new Map<number, BotChickenController>();
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
@@ -130,6 +137,9 @@ export class MatchScene extends Phaser.Scene {
     this.presentationFeedback = new MatchPresentationFeedback();
     this.transitioned = false;
     this.chickBodies = [];
+    this.botControllers = new Map(
+      this.botSlots.map((slot) => [slot, createBotChickenController()]),
+    );
     this.initAudio();
 
     this.physics.world.setBounds(
@@ -699,7 +709,7 @@ export class MatchScene extends Phaser.Scene {
       );
       this.p1Chicken.setVelocity(p1Velocity.vx, p1Velocity.vy);
     } else {
-      this.p1Chicken.setVelocity(0, 0);
+      this.handleBotMovement(0, this.p1Chicken);
     }
 
     const p2IsBot = this.botSlots.includes(1);
@@ -715,8 +725,49 @@ export class MatchScene extends Phaser.Scene {
       );
       this.p2Chicken.setVelocity(p2Velocity.vx, p2Velocity.vy);
     } else {
-      this.p2Chicken.setVelocity(0, 0);
+      this.handleBotMovement(1, this.p2Chicken);
     }
+  }
+
+  private handleBotMovement(
+    playerIndex: number,
+    chicken: Phaser.Physics.Arcade.Sprite,
+  ): void {
+    const controller = this.botControllers.get(playerIndex);
+    if (!controller) {
+      chicken.setVelocity(0, 0);
+      return;
+    }
+
+    const result = tickBotChickenController(controller, {
+      botPosition: { x: chicken.x, y: chicken.y },
+      elapsedMs: this.match.view().elapsedMs,
+      speed: MOVE_SPEED,
+      visibleTargets: this.getVisibleBotTargets(),
+    });
+    this.botControllers.set(playerIndex, result.controller);
+    chicken.setVelocity(result.velocity.vx, result.velocity.vy);
+  }
+
+  private getVisibleBotTargets(): BotChickenTarget[] {
+    const view = this.match.view();
+    const targets = view.normalChicks.flatMap((chick) => {
+      const spot = FARMYARD_LAYOUT.hidingSpots[chick.spotIndex];
+      return spot ? [{ spotIndex: chick.spotIndex, x: spot.x, y: spot.y }] : [];
+    });
+
+    if (view.greenChick) {
+      const spot = FARMYARD_LAYOUT.hidingSpots[view.greenChick.spotIndex];
+      if (spot) {
+        targets.push({
+          spotIndex: view.greenChick.spotIndex,
+          x: spot.x,
+          y: spot.y,
+        });
+      }
+    }
+
+    return targets;
   }
 
   private updatePlayerChickenPersonality(elapsedMs: number): void {

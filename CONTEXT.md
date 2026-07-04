@@ -48,6 +48,10 @@ _Avoid_: Mouse cursor, pointer, selector
 A cute, visibly mechanical chicken cursor that controls a player slot automatically during a local match, behaving human-ish enough to make solo matches feel lively and winnable rather than optimal.
 _Avoid_: NPC, AI opponent, perfect computer player, enemy robot
 
+**Bot Chicken Indecision**:
+A subtle, brief visible wrong-way or noncommittal movement from a bot chicken before it corrects toward a claim target, making bot behavior feel human-ish without changing movement speed, bounds, or claim rules.
+_Avoid_: Difficulty setting, strategy, rubber-banding, invisible random delay
+
 **Chicken Cursor Personality**:
 Lightweight visual character in a chicken cursor's movement, such as bobbing, squash, or tiny footstep motion, without changing movement speed, acceleration, bounds, or claiming rules.
 _Avoid_: Movement tuning, collision, physics

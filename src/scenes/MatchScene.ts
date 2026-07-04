@@ -3,6 +3,7 @@ import {
   computeClaimPopScale,
   NORMAL_PEEK_COUNT,
   NORMAL_CHICK_POINTS,
+  type PlayerSlotCount,
 } from "../match/rules";
 import { Match, type MatchEvent } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
@@ -33,6 +34,13 @@ import {
 } from "./matchAssets";
 import { generateTextureOnce } from "./textures";
 
+interface MatchSceneData {
+  p1Color?: PlayerChickenColor;
+  p2Color?: PlayerChickenColor;
+  playerSlotCount?: PlayerSlotCount;
+  botSlots?: number[];
+}
+
 export type MatchSfxId = "normalClaim" | "greenChickAppear" | "greenChickClaim";
 
 const MATCH_SFX_MOMENTS: Record<MatchSfxId, SfxMoment> = {
@@ -44,11 +52,6 @@ const MATCH_SFX_MOMENTS: Record<MatchSfxId, SfxMoment> = {
 const PLAYER_SIZE = 28 * WORLD_SCALE;
 const CHICK_SIZE = 16 * WORLD_SCALE;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
-
-interface MatchSceneData {
-  p1Color?: PlayerChickenColor;
-  p2Color?: PlayerChickenColor;
-}
 
 interface ClaimScoreEcho {
   text: Phaser.GameObjects.Text;
@@ -75,6 +78,8 @@ export class MatchScene extends Phaser.Scene {
   private transitioned = false;
   private p1Color: PlayerChickenColor = "blue";
   private p2Color: PlayerChickenColor = "red";
+  private playerSlotCount: PlayerSlotCount = 2;
+  private botSlots: number[] = [];
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
@@ -106,6 +111,8 @@ export class MatchScene extends Phaser.Scene {
   init(data: MatchSceneData): void {
     if (data.p1Color) this.p1Color = data.p1Color;
     if (data.p2Color) this.p2Color = data.p2Color;
+    if (data.playerSlotCount) this.playerSlotCount = data.playerSlotCount;
+    if (data.botSlots) this.botSlots = data.botSlots;
   }
 
   preload(): void {
@@ -117,6 +124,7 @@ export class MatchScene extends Phaser.Scene {
 
     this.match = new Match({
       spotCount: FARMYARD_LAYOUT.hidingSpots.length,
+      playerSlotCount: this.playerSlotCount,
       random: () => Math.random(),
     });
     this.presentationFeedback = new MatchPresentationFeedback();
@@ -170,6 +178,7 @@ export class MatchScene extends Phaser.Scene {
           playerColors: [this.p1Color, this.p2Color],
           p1Color: this.p1Color,
           p2Color: this.p2Color,
+          botSlots: this.botSlots,
         });
       });
     }
@@ -677,27 +686,37 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private handleMovement(): void {
-    const p1Velocity = computeMoveVelocity(
-      {
-        left: this.wasd.A.isDown,
-        right: this.wasd.D.isDown,
-        up: this.wasd.W.isDown,
-        down: this.wasd.S.isDown,
-      },
-      MOVE_SPEED,
-    );
-    this.p1Chicken.setVelocity(p1Velocity.vx, p1Velocity.vy);
+    const p1IsBot = this.botSlots.includes(0);
+    if (!p1IsBot) {
+      const p1Velocity = computeMoveVelocity(
+        {
+          left: this.wasd.A.isDown,
+          right: this.wasd.D.isDown,
+          up: this.wasd.W.isDown,
+          down: this.wasd.S.isDown,
+        },
+        MOVE_SPEED,
+      );
+      this.p1Chicken.setVelocity(p1Velocity.vx, p1Velocity.vy);
+    } else {
+      this.p1Chicken.setVelocity(0, 0);
+    }
 
-    const p2Velocity = computeMoveVelocity(
-      {
-        left: this.arrows.left.isDown,
-        right: this.arrows.right.isDown,
-        up: this.arrows.up.isDown,
-        down: this.arrows.down.isDown,
-      },
-      MOVE_SPEED,
-    );
-    this.p2Chicken.setVelocity(p2Velocity.vx, p2Velocity.vy);
+    const p2IsBot = this.botSlots.includes(1);
+    if (!p2IsBot) {
+      const p2Velocity = computeMoveVelocity(
+        {
+          left: this.arrows.left.isDown,
+          right: this.arrows.right.isDown,
+          up: this.arrows.up.isDown,
+          down: this.arrows.down.isDown,
+        },
+        MOVE_SPEED,
+      );
+      this.p2Chicken.setVelocity(p2Velocity.vx, p2Velocity.vy);
+    } else {
+      this.p2Chicken.setVelocity(0, 0);
+    }
   }
 
   private updatePlayerChickenPersonality(elapsedMs: number): void {
@@ -968,8 +987,10 @@ export class MatchScene extends Phaser.Scene {
     this.timerText.setText(`Time: ${seconds}s`);
 
     const p1Label = getPlayerChickenColorLabel(this.p1Color);
-    const p2Label = getPlayerChickenColorLabel(this.p2Color);
+    const p2DisplayLabel = this.botSlots.includes(1)
+      ? "Bot Chicken"
+      : getPlayerChickenColorLabel(this.p2Color);
     this.p1ScoreText.setText(`P1 (${p1Label}): ${view.scores[0]}`);
-    this.p2ScoreText.setText(`P2 (${p2Label}): ${view.scores[1]}`);
+    this.p2ScoreText.setText(`P2 (${p2DisplayLabel}): ${view.scores[1]}`);
   }
 }

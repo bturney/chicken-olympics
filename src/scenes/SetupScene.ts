@@ -9,6 +9,7 @@ import {
   type SetupSelection,
 } from "../setup/colors";
 import { WORLD_SCALE } from "../match/layout";
+import { type PlayerSlotCount } from "../match/rules";
 
 const SWATCH_X_POSITIONS = [
   160 * WORLD_SCALE,
@@ -18,7 +19,8 @@ const SWATCH_X_POSITIONS = [
 ] as const;
 const P1_SWATCH_Y = 180 * WORLD_SCALE;
 const P2_SWATCH_Y = 290 * WORLD_SCALE;
-const START_BUTTON_Y = 380 * WORLD_SCALE;
+const START_BUTTON_Y = 420 * WORLD_SCALE;
+const P2_TOGGLE_Y = 250 * WORLD_SCALE;
 
 interface SwatchButton {
   player: 0 | 1;
@@ -27,10 +29,20 @@ interface SwatchButton {
   marker: Phaser.GameObjects.Text;
 }
 
+interface MatchSceneData {
+  p1Color?: PlayerChickenColor;
+  p2Color?: PlayerChickenColor;
+  playerSlotCount?: PlayerSlotCount;
+  botSlots?: number[];
+}
+
 export class SetupScene extends Phaser.Scene {
   private selection: SetupSelection = { p1: null, p2: null };
   private swatches: SwatchButton[] = [];
   private startButton!: Phaser.GameObjects.Text;
+  private p2Toggle!: Phaser.GameObjects.Text;
+  private p2IsBot = false;
+  private p2BotColor = "green";
 
   constructor() {
     super("SetupScene");
@@ -39,6 +51,8 @@ export class SetupScene extends Phaser.Scene {
   create(): void {
     this.selection = { p1: null, p2: null };
     this.swatches = [];
+    this.p2IsBot = false;
+    this.p2BotColor = "green";
 
     const { width } = this.scale;
 
@@ -66,6 +80,20 @@ export class SetupScene extends Phaser.Scene {
     this.createSwatchRow(0, P1_SWATCH_Y);
     this.createSwatchRow(1, P2_SWATCH_Y);
 
+    this.p2Toggle = this.add
+      .text(width / 2, P2_TOGGLE_Y, "[ Player 2: Human ]", {
+        fontSize: `${16 * WORLD_SCALE}px`,
+        color: "#ffdd44",
+        backgroundColor: "#333355",
+        padding: { x: 12 * WORLD_SCALE, y: 6 * WORLD_SCALE },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.p2Toggle.on("pointerdown", () => this.toggleP2Mode());
+    this.p2Toggle.on("pointerover", () => this.p2Toggle.setColor("#ffffff"));
+    this.p2Toggle.on("pointerout", () => this.p2Toggle.setColor("#ffdd44"));
+
     this.startButton = this.add
       .text(width / 2, START_BUTTON_Y, "[ Start Match ]", {
         fontSize: `${24 * WORLD_SCALE}px`,
@@ -75,6 +103,18 @@ export class SetupScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    this.refreshSwatchState();
+    this.refreshStartButton();
+  }
+
+  private toggleP2Mode(): void {
+    this.p2IsBot = !this.p2IsBot;
+    if (this.p2IsBot) {
+      this.p2Toggle.setText("[ Player 2: Bot Chicken ]");
+      this.selection = { ...this.selection, p2: null };
+    } else {
+      this.p2Toggle.setText("[ Player 2: Human ]");
+    }
     this.refreshSwatchState();
     this.refreshStartButton();
   }
@@ -123,6 +163,15 @@ export class SetupScene extends Phaser.Scene {
         swatch.player === 0 ? this.selection.p1 : this.selection.p2;
       const otherPick =
         swatch.player === 0 ? this.selection.p2 : this.selection.p1;
+
+      if (swatch.player === 1 && this.p2IsBot) {
+        swatch.text.setAlpha(0.35);
+        swatch.text.setColor("#aaaaaa");
+        swatch.text.disableInteractive();
+        swatch.marker.setText("🤖");
+        continue;
+      }
+
       const allowed = availableColors(this.selection, swatch.player);
       const isAllowed = allowed.includes(swatch.color);
       const isPicked = playerPick === swatch.color;
@@ -165,10 +214,14 @@ export class SetupScene extends Phaser.Scene {
         this.startButton.setColor("#44ff44"),
       );
       this.startButton.on("pointerdown", () => {
-        this.scene.start("MatchScene", {
-          p1Color: this.selection.p1,
-          p2Color: this.selection.p2,
-        });
+        const botSlots = this.p2IsBot ? [1] : [];
+        const sceneData: MatchSceneData = {
+          p1Color: this.selection.p1 ?? undefined,
+          p2Color: this.p2IsBot ? undefined : (this.selection.p2 ?? undefined),
+          playerSlotCount: 2,
+          botSlots,
+        };
+        this.scene.start("MatchScene", sceneData);
       });
     } else {
       this.startButton.setColor("#888888");

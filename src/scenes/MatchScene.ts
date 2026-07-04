@@ -26,6 +26,11 @@ import {
   type SceneAudioSource,
 } from "../audio/scene-audio";
 import { MatchPresentationFeedback } from "./MatchPresentationFeedback";
+import {
+  MATCH_SLICE_ASSET_KEYS,
+  preloadMatchSliceRuntimeAssets,
+  registerMatchSliceGeneratedTextures,
+} from "./matchAssets";
 import { generateTextureOnce } from "./textures";
 
 export type MatchSfxId = "normalClaim" | "greenChickAppear" | "greenChickClaim";
@@ -38,8 +43,6 @@ const MATCH_SFX_MOMENTS: Record<MatchSfxId, SfxMoment> = {
 
 const PLAYER_SIZE = 28 * WORLD_SCALE;
 const CHICK_SIZE = 16 * WORLD_SCALE;
-const CHICK_COLOR = 0xffdd44;
-const GREEN_CHICK_COLOR = 0x44cc44;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
 interface MatchSceneData {
@@ -60,10 +63,6 @@ interface GreenClaimBeat {
 const GREEN_CHICK_VISIBLE_SCALE = 1.35;
 const GREEN_CLAIM_BEAT_DURATION_MS = 850;
 const GREEN_CLAIM_BEAT_PEAK_SCALE = 2.8;
-
-function playerTextureKey(player: 1 | 2, color: PlayerChickenColor): string {
-  return `p${player}_chicken_${color}`;
-}
 
 export class MatchScene extends Phaser.Scene {
   private match!: Match;
@@ -107,6 +106,10 @@ export class MatchScene extends Phaser.Scene {
   init(data: MatchSceneData): void {
     if (data.p1Color) this.p1Color = data.p1Color;
     if (data.p2Color) this.p2Color = data.p2Color;
+  }
+
+  preload(): void {
+    preloadMatchSliceRuntimeAssets(this.load);
   }
 
   create(): void {
@@ -248,7 +251,7 @@ export class MatchScene extends Phaser.Scene {
 
   private createPlayers(): void {
     generateTextureOnce({
-      key: playerTextureKey(1, this.p1Color),
+      key: MATCH_SLICE_ASSET_KEYS.playerChicken(1, this.p1Color),
       width: PLAYER_SIZE * 2,
       height: PLAYER_SIZE * 2,
       exists: (key) => this.textures.exists(key),
@@ -259,7 +262,7 @@ export class MatchScene extends Phaser.Scene {
     });
 
     generateTextureOnce({
-      key: playerTextureKey(2, this.p2Color),
+      key: MATCH_SLICE_ASSET_KEYS.playerChicken(2, this.p2Color),
       width: PLAYER_SIZE * 2,
       height: PLAYER_SIZE * 2,
       exists: (key) => this.textures.exists(key),
@@ -284,7 +287,7 @@ export class MatchScene extends Phaser.Scene {
     this.p1Chicken = this.physics.add.sprite(
       p1Start.x,
       p1Start.y,
-      playerTextureKey(1, this.p1Color),
+      MATCH_SLICE_ASSET_KEYS.playerChicken(1, this.p1Color),
     );
     this.p1Chicken.setCollideWorldBounds(true);
     this.p1Chicken.setDepth(2);
@@ -309,7 +312,7 @@ export class MatchScene extends Phaser.Scene {
     this.p2Chicken = this.physics.add.sprite(
       p2Start.x,
       p2Start.y,
-      playerTextureKey(2, this.p2Color),
+      MATCH_SLICE_ASSET_KEYS.playerChicken(2, this.p2Color),
     );
     this.p2Chicken.setCollideWorldBounds(true);
     this.p2Chicken.setDepth(2);
@@ -426,43 +429,29 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private createChicks(): void {
-    generateTextureOnce({
-      key: "chick",
-      width: CHICK_SIZE * 2,
-      height: CHICK_SIZE * 2,
+    registerMatchSliceGeneratedTextures({
+      chickSize: CHICK_SIZE,
       exists: (key) => this.textures.exists(key),
       createGraphics: () => this.add.graphics(),
-      draw: (gfx) => {
-        gfx.fillStyle(CHICK_COLOR);
-        gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
-      },
-    });
-
-    generateTextureOnce({
-      key: "green_chick",
-      width: CHICK_SIZE * 2,
-      height: CHICK_SIZE * 2,
-      exists: (key) => this.textures.exists(key),
-      createGraphics: () => this.add.graphics(),
-      draw: (gfx) => {
-        gfx.fillStyle(GREEN_CHICK_COLOR);
-        gfx.fillCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE);
-        gfx.lineStyle(3, 0xd8ffd0, 1);
-        gfx.strokeCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE - 1);
-        gfx.lineStyle(2, 0x1e7a1e, 1);
-        gfx.strokeCircle(CHICK_SIZE, CHICK_SIZE, CHICK_SIZE - 4);
-      },
     });
 
     for (let i = 0; i < NORMAL_PEEK_COUNT; i++) {
-      const body = this.physics.add.sprite(0, 0, "chick");
+      const body = this.physics.add.sprite(
+        0,
+        0,
+        MATCH_SLICE_ASSET_KEYS.normalChick,
+      );
       body.body.enable = false;
       body.setVisible(false);
       body.setImmovable(true);
       this.chickBodies.push(body);
     }
 
-    this.greenChickBody = this.physics.add.sprite(0, 0, "green_chick");
+    this.greenChickBody = this.physics.add.sprite(
+      0,
+      0,
+      MATCH_SLICE_ASSET_KEYS.greenChick,
+    );
     this.greenChickBody.body!.enable = false;
     this.greenChickBody.setVisible(false);
     this.greenChickBody.setImmovable(true);

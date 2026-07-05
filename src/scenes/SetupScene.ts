@@ -21,6 +21,9 @@ const P1_SWATCH_Y = 180 * WORLD_SCALE;
 const P2_SWATCH_Y = 290 * WORLD_SCALE;
 const START_BUTTON_Y = 420 * WORLD_SCALE;
 const P2_TOGGLE_Y = 250 * WORLD_SCALE;
+const HELP_BUTTON_X = 780 * WORLD_SCALE;
+const HELP_BUTTON_Y = 20 * WORLD_SCALE;
+const CONTROL_STRIP_Y = 470 * WORLD_SCALE;
 
 interface SwatchButton {
   player: 0 | 1;
@@ -43,6 +46,7 @@ export class SetupScene extends Phaser.Scene {
   private p2Toggle!: Phaser.GameObjects.Text;
   private p2IsBot = false;
   private p2BotColor = "green";
+  private helpOverlayElements: { setVisible(v: boolean): void }[] = [];
 
   constructor() {
     super("SetupScene");
@@ -102,6 +106,39 @@ export class SetupScene extends Phaser.Scene {
         padding: { x: 20 * WORLD_SCALE, y: 10 * WORLD_SCALE },
       })
       .setOrigin(0.5);
+
+    const { height } = this.scale;
+
+    this.add
+      .text(
+        width / 2,
+        CONTROL_STRIP_Y,
+        "P1: WASD  |  P2: Arrows  |  Claim chicks to score!",
+        {
+          fontSize: `${11 * WORLD_SCALE}px`,
+          color: "#4a4a6a",
+        },
+      )
+      .setOrigin(0.5);
+
+    const helpButton = this.add
+      .text(HELP_BUTTON_X, HELP_BUTTON_Y, "[ ? ]", {
+        fontSize: `${13 * WORLD_SCALE}px`,
+        color: "#4a4a6a",
+        backgroundColor: "#1a1a2e",
+        padding: { x: 6 * WORLD_SCALE, y: 3 * WORLD_SCALE },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(10);
+
+    helpButton.on("pointerover", () => helpButton.setColor("#8888aa"));
+    helpButton.on("pointerout", () => helpButton.setColor("#4a4a6a"));
+    helpButton.on("pointerdown", () => this.showHelpOverlay());
+
+    void height;
+
+    this.createHelpOverlay();
 
     this.refreshSwatchState();
     this.refreshStartButton();
@@ -228,6 +265,106 @@ export class SetupScene extends Phaser.Scene {
       this.startButton.setBackgroundColor("#222233");
       this.startButton.disableInteractive();
       this.startButton.removeAllListeners();
+    }
+  }
+
+  private createHelpOverlay(): void {
+    const { width, height } = this.scale;
+    const depth = 50;
+    const elements = this.helpOverlayElements;
+
+    const bg = this.add
+      .rectangle(width / 2, height / 2, width, height, 0x000000, 0.88)
+      .setDepth(depth)
+      .setVisible(false);
+    elements.push(bg);
+
+    const title = this.add
+      .text(width / 2, 70 * WORLD_SCALE, "HOW TO PLAY", {
+        fontSize: `${28 * WORLD_SCALE}px`,
+        color: "#ffffff",
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 1)
+      .setVisible(false);
+    elements.push(title);
+
+    const lines = [
+      { text: "Controls", y: 140, fontSize: 20 },
+      { text: "Player 1: WASD keys", y: 170, fontSize: 15 },
+      { text: "Player 2: Arrow keys", y: 195, fontSize: 15 },
+      { text: "Goal", y: 245, fontSize: 20 },
+      {
+        text: "Claim the most chicks before time runs out.",
+        y: 275,
+        fontSize: 15,
+      },
+      { text: "Claiming", y: 325, fontSize: 20 },
+      {
+        text: "Move your chicken over a peeking yellow chick",
+        y: 355,
+        fontSize: 15,
+      },
+      {
+        text: "to claim it. Each claim is worth 1 point.",
+        y: 380,
+        fontSize: 15,
+      },
+      { text: "Green Chick", y: 430, fontSize: 20 },
+      {
+        text: "A rare green chick appears once per match.",
+        y: 460,
+        fontSize: 15,
+      },
+      { text: "Claim it for 5 points.", y: 485, fontSize: 15 },
+      { text: "Match Timer", y: 535, fontSize: 20 },
+      {
+        text: "90 seconds. Highest score when time runs out wins.",
+        y: 565,
+        fontSize: 15,
+      },
+    ];
+
+    for (const line of lines) {
+      const t = this.add
+        .text(width / 2, line.y * WORLD_SCALE, line.text, {
+          fontSize: `${line.fontSize * WORLD_SCALE}px`,
+          color: line.fontSize >= 20 ? "#dddddd" : "#9999aa",
+        })
+        .setOrigin(0.5)
+        .setDepth(depth + 1)
+        .setVisible(false);
+      elements.push(t);
+    }
+
+    const gotIt = this.add
+      .text(width / 2, 620 * WORLD_SCALE, "[ Got it ]", {
+        fontSize: `${20 * WORLD_SCALE}px`,
+        color: "#44ff44",
+        backgroundColor: "#333355",
+        padding: { x: 16 * WORLD_SCALE, y: 8 * WORLD_SCALE },
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 1)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+
+    gotIt.on("pointerover", () => gotIt.setColor("#88ff88"));
+    gotIt.on("pointerout", () => gotIt.setColor("#44ff44"));
+    gotIt.on("pointerdown", () => this.hideHelpOverlay());
+
+    elements.push(gotIt);
+  }
+
+  private showHelpOverlay(): void {
+    for (const el of this.helpOverlayElements) {
+      el.setVisible(true);
+    }
+  }
+
+  private hideHelpOverlay(): void {
+    for (const el of this.helpOverlayElements) {
+      el.setVisible(false);
     }
   }
 }

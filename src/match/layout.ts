@@ -35,6 +35,19 @@ export interface FarmyardLayout {
  */
 export const WORLD_SCALE = 2;
 
+export const SETUP_SCENE_LAYOUT = {
+  P1_LABEL_Y: 130,
+  P1_SWATCH_Y: 180,
+  P2_LABEL_Y: 210,
+  P2_TOGGLE_Y: 250,
+  P2_SWATCH_Y: 290,
+  START_BUTTON_Y: 420,
+  HELP_BUTTON_X: 780,
+  HELP_BUTTON_Y: 20,
+  CONTROL_STRIP_Y: 470,
+  SWATCH_X_POSITIONS: [160, 320, 480, 640] as readonly number[],
+} as const;
+
 export const FARMYARD_LAYOUT: FarmyardLayout = {
   bounds: {
     x: 40 * WORLD_SCALE,

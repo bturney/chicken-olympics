@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   FARMYARD_LAYOUT,
   HIDING_SPOT_TYPES,
+  SETUP_SCENE_LAYOUT,
   type HidingSpot,
   type HidingSpotType,
 } from "../src/match/layout";
@@ -113,5 +114,27 @@ describe("FarmyardLayout", () => {
       expect(seen.has(key)).toBe(false);
       seen.add(key);
     }
+  });
+});
+
+describe("Setup scene layout", () => {
+  it("keeps Player 2 label and the human/bot toggle sufficiently separated vertically", () => {
+    const gap =
+      SETUP_SCENE_LAYOUT.P2_TOGGLE_Y - SETUP_SCENE_LAYOUT.P2_LABEL_Y;
+    expect(gap).toBeGreaterThanOrEqual(40);
+  });
+
+  it("keeps the Player 2 toggle above the Player 2 swatches with enough room", () => {
+    const gap =
+      SETUP_SCENE_LAYOUT.P2_SWATCH_Y - SETUP_SCENE_LAYOUT.P2_TOGGLE_Y;
+    expect(gap).toBeGreaterThanOrEqual(30);
+  });
+
+  it("maintains Player 1 label and swatch spacing comparable to Player 2", () => {
+    const p1Gap =
+      SETUP_SCENE_LAYOUT.P1_SWATCH_Y - SETUP_SCENE_LAYOUT.P1_LABEL_Y;
+    const p2Gap =
+      SETUP_SCENE_LAYOUT.P2_TOGGLE_Y - SETUP_SCENE_LAYOUT.P2_LABEL_Y;
+    expect(p1Gap - p2Gap).toBeLessThanOrEqual(20);
   });
 });

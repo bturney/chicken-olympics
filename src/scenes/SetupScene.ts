@@ -8,22 +8,19 @@ import {
   type PlayerChickenColor,
   type SetupSelection,
 } from "../setup/colors";
-import { WORLD_SCALE } from "../match/layout";
+import { SETUP_SCENE_LAYOUT, WORLD_SCALE } from "../match/layout";
 import { type PlayerSlotCount } from "../match/rules";
 
-const SWATCH_X_POSITIONS = [
-  160 * WORLD_SCALE,
-  320 * WORLD_SCALE,
-  480 * WORLD_SCALE,
-  640 * WORLD_SCALE,
-] as const;
-const P1_SWATCH_Y = 180 * WORLD_SCALE;
-const P2_SWATCH_Y = 290 * WORLD_SCALE;
-const START_BUTTON_Y = 420 * WORLD_SCALE;
-const P2_TOGGLE_Y = 250 * WORLD_SCALE;
-const HELP_BUTTON_X = 780 * WORLD_SCALE;
-const HELP_BUTTON_Y = 20 * WORLD_SCALE;
-const CONTROL_STRIP_Y = 470 * WORLD_SCALE;
+const SWATCH_X_POSITIONS = SETUP_SCENE_LAYOUT.SWATCH_X_POSITIONS.map(
+  (x) => x * WORLD_SCALE,
+);
+const P1_SWATCH_Y = SETUP_SCENE_LAYOUT.P1_SWATCH_Y * WORLD_SCALE;
+const P2_SWATCH_Y = SETUP_SCENE_LAYOUT.P2_SWATCH_Y * WORLD_SCALE;
+const START_BUTTON_Y = SETUP_SCENE_LAYOUT.START_BUTTON_Y * WORLD_SCALE;
+const P2_TOGGLE_Y = SETUP_SCENE_LAYOUT.P2_TOGGLE_Y * WORLD_SCALE;
+const HELP_BUTTON_X = SETUP_SCENE_LAYOUT.HELP_BUTTON_X * WORLD_SCALE;
+const HELP_BUTTON_Y = SETUP_SCENE_LAYOUT.HELP_BUTTON_Y * WORLD_SCALE;
+const CONTROL_STRIP_Y = SETUP_SCENE_LAYOUT.CONTROL_STRIP_Y * WORLD_SCALE;
 
 interface SwatchButton {
   player: 0 | 1;
@@ -68,14 +65,14 @@ export class SetupScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, 130 * WORLD_SCALE, "Player 1", {
+      .text(width / 2, SETUP_SCENE_LAYOUT.P1_LABEL_Y * WORLD_SCALE, "Player 1", {
         fontSize: `${20 * WORLD_SCALE}px`,
         color: "#ffffff",
       })
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, 240 * WORLD_SCALE, "Player 2", {
+      .text(width / 2, SETUP_SCENE_LAYOUT.P2_LABEL_Y * WORLD_SCALE, "Player 2", {
         fontSize: `${20 * WORLD_SCALE}px`,
         color: "#ffffff",
       })

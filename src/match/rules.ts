@@ -1,8 +1,13 @@
-import { FARMYARD_LAYOUT } from "./layout";
+import { createArena } from "./arena";
 
 export interface MatchOptions {
   durationMs?: number;
   playerSlotCount?: PlayerSlotCount;
+}
+
+export interface SpotPosition {
+  x: number;
+  y: number;
 }
 
 export type PlayerSlotCount = 2 | 3 | 4;
@@ -121,20 +126,20 @@ function selectFreeSpotForGreenChick(
   currentTimeMs: number,
   spotCount: number,
   randomValue: number,
+  spotPositions?: readonly SpotPosition[],
 ): number | null {
-  const occupied = new Set(
-    getReservedNormalSpotIndices(peekState, currentTimeMs),
-  );
-  if (greenChickState.activeSpotIndex !== null) {
-    occupied.add(greenChickState.activeSpotIndex);
-  }
-  const free: number[] = [];
-  for (let i = 0; i < spotCount; i++) {
-    if (!occupied.has(i)) free.push(i);
-  }
-  if (free.length === 0) return null;
-  const index = Math.floor(randomValue * free.length);
-  return free[Math.min(index, free.length - 1)] ?? null;
+  return createArena({
+    spotCount,
+    spotPositions,
+    occupiedSpotIndices: [
+      ...getOccupiedNormalSpotIndices(peekState, currentTimeMs),
+      ...(greenChickState.activeSpotIndex === null
+        ? []
+        : [greenChickState.activeSpotIndex]),
+    ],
+    reservedSpotIndices: getReservedNormalSpotIndices(peekState, currentTimeMs),
+    recentSpotIndices: peekState.recentSpotIndices,
+  }).allocateSpot(randomValue);
 }
 
 export function isGreenChickPeekActive(
@@ -168,6 +173,7 @@ export function tickGreenChickState(
   currentTimeMs: number,
   spotCount: number,
   random: () => number,
+  spotPositions?: readonly SpotPosition[],
 ): GreenChickState {
   if (greenChickState.status === "claimed") {
     return greenChickState;
@@ -206,6 +212,7 @@ export function tickGreenChickState(
     currentTimeMs,
     spotCount,
     random(),
+    spotPositions,
   );
 
   if (spot === null) {
@@ -313,6 +320,13 @@ export function getActiveNormalSpotIndices(
   peekState: PeekState,
   currentTimeMs: number,
 ): readonly number[] {
+  return getOccupiedNormalSpotIndices(peekState, currentTimeMs);
+}
+
+function getOccupiedNormalSpotIndices(
+  peekState: PeekState,
+  currentTimeMs: number,
+): readonly number[] {
   const out: number[] = [];
   for (const peek of peekState.peeks) {
     if (isPeekActive(peek, currentTimeMs) && peek.activeSpotIndex !== null) {
@@ -326,7 +340,7 @@ function getReservedNormalSpotIndices(
   peekState: PeekState,
   currentTimeMs: number,
 ): readonly number[] {
-  const out = new Set(getActiveNormalSpotIndices(peekState, currentTimeMs));
+  const out = new Set<number>();
   for (const peek of peekState.peeks) {
     if (
       isPeekAnticipating(peek, currentTimeMs) &&
@@ -351,54 +365,15 @@ export function selectFreeSpotIndex(
   currentTimeMs: number,
   spotCount: number,
   randomValue: number,
+  spotPositions?: readonly SpotPosition[],
 ): number | null {
-  const active = new Set(
-    getReservedNormalSpotIndices(peekState, currentTimeMs),
-  );
-  const free: number[] = [];
-  for (let i = 0; i < spotCount; i++) {
-    if (!active.has(i)) free.push(i);
-  }
-  if (free.length === 0) return null;
-
-  const recent = peekState.recentSpotIndices.filter((spot) => spot < spotCount);
-  const recentSet = new Set(recent);
-  const candidates =
-    recent.length > 0 ? free.filter((spot) => !recentSet.has(spot)) : free;
-  const pool = candidates.length > 0 ? candidates : free;
-
-  let bestDistance = -1;
-  const scored = pool.map((spot) => {
-    let distance = 0;
-    if (recent.length > 0) {
-      const spotPosition = FARMYARD_LAYOUT.hidingSpots[spot];
-      if (spotPosition !== undefined) {
-        let shortest = Number.POSITIVE_INFINITY;
-        for (const recentSpot of recent) {
-          const recentPosition = FARMYARD_LAYOUT.hidingSpots[recentSpot];
-          if (recentPosition === undefined) continue;
-          const dx = spotPosition.x - recentPosition.x;
-          const dy = spotPosition.y - recentPosition.y;
-          const d = Math.hypot(dx, dy);
-          if (d < shortest) shortest = d;
-        }
-        if (shortest !== Number.POSITIVE_INFINITY) {
-          distance = shortest;
-        }
-      }
-    }
-    if (distance > bestDistance) {
-      bestDistance = distance;
-    }
-    return { spot, distance };
-  });
-
-  const best =
-    recent.length > 0
-      ? scored.filter((candidate) => candidate.distance === bestDistance)
-      : scored;
-  const index = Math.floor(randomValue * best.length);
-  return best[Math.min(index, best.length - 1)]?.spot ?? null;
+  return createArena({
+    spotCount,
+    spotPositions,
+    occupiedSpotIndices: getOccupiedNormalSpotIndices(peekState, currentTimeMs),
+    reservedSpotIndices: getReservedNormalSpotIndices(peekState, currentTimeMs),
+    recentSpotIndices: peekState.recentSpotIndices,
+  }).allocateSpot(randomValue);
 }
 
 function fillSlotAt(
@@ -459,6 +434,7 @@ export function tickPeekState(
   currentTimeMs: number,
   spotCount: number,
   random: () => number,
+  spotPositions?: readonly SpotPosition[],
 ): PeekState {
   const peeks: NormalPeek[] = [];
   let workingState = peekState;
@@ -510,6 +486,7 @@ export function tickPeekState(
         currentTimeMs,
         spotCount,
         random(),
+        spotPositions,
       );
       if (spot === null) {
         peeks.push(peek);

@@ -19,12 +19,14 @@ import {
   type PlayerIndex,
   type PlayerSlotCount,
   type PeekState,
+  type SpotPosition,
 } from "./rules";
 
 export interface MatchOptions {
   durationMs?: number;
   playerSlotCount?: PlayerSlotCount;
   spotCount: number;
+  spotPositions?: readonly SpotPosition[];
   random?: () => number;
 }
 
@@ -71,6 +73,7 @@ export class Match {
   private greenChickState: GreenChickState;
   private readonly random: () => number;
   private readonly spotCount: number;
+  private readonly spotPositions: readonly SpotPosition[] | undefined;
 
   constructor(options: MatchOptions) {
     this.matchState = createMatchState({
@@ -80,6 +83,7 @@ export class Match {
     this.peekState = createPeekState(0);
     this.random = options.random ?? Math.random;
     this.spotCount = options.spotCount;
+    this.spotPositions = options.spotPositions;
     this.greenChickState = createGreenChickState(
       this.matchState.durationMs,
       this.random,
@@ -93,6 +97,7 @@ export class Match {
       this.matchState.elapsedMs,
       this.spotCount,
       this.random,
+      this.spotPositions,
     );
     const previousGreenStatus = this.greenChickState.status;
     const previousGreenSpot = this.greenChickState.activeSpotIndex;
@@ -106,6 +111,7 @@ export class Match {
       this.matchState.elapsedMs,
       this.spotCount,
       this.random,
+      this.spotPositions,
     );
     const greenActiveSpot = getActiveGreenChickSpotIndex(
       this.greenChickState,

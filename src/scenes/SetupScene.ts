@@ -18,7 +18,6 @@ const P1_SWATCH_Y = SETUP_SCENE_LAYOUT.P1_SWATCH_Y * WORLD_SCALE;
 const P2_SWATCH_Y = SETUP_SCENE_LAYOUT.P2_SWATCH_Y * WORLD_SCALE;
 const START_BUTTON_Y = SETUP_SCENE_LAYOUT.START_BUTTON_Y * WORLD_SCALE;
 const P2_TOGGLE_Y = SETUP_SCENE_LAYOUT.P2_TOGGLE_Y * WORLD_SCALE;
-const HELP_BUTTON_X = SETUP_SCENE_LAYOUT.HELP_BUTTON_X * WORLD_SCALE;
 const HELP_BUTTON_Y = SETUP_SCENE_LAYOUT.HELP_BUTTON_Y * WORLD_SCALE;
 const CONTROL_STRIP_Y = SETUP_SCENE_LAYOUT.CONTROL_STRIP_Y * WORLD_SCALE;
 
@@ -106,31 +105,33 @@ export class SetupScene extends Phaser.Scene {
 
     const { height } = this.scale;
 
+    const controlStripText = "P1: WASD  |  P2: Arrows  |  Claim chicks to score!";
+    const controlFontSize = 13 * WORLD_SCALE;
+    const controlPaddingX = 16 * WORLD_SCALE;
+    const controlPaddingY = 8 * WORLD_SCALE;
+
     this.add
-      .text(
-        width / 2,
-        CONTROL_STRIP_Y,
-        "P1: WASD  |  P2: Arrows  |  Claim chicks to score!",
-        {
-          fontSize: `${11 * WORLD_SCALE}px`,
-          color: "#4a4a6a",
-        },
-      )
+      .text(width / 2, CONTROL_STRIP_Y, controlStripText, {
+        fontSize: `${controlFontSize}px`,
+        color: "#ccccdd",
+        backgroundColor: "#0a0a1e",
+        padding: { x: controlPaddingX, y: controlPaddingY },
+      })
       .setOrigin(0.5);
 
     const helpButton = this.add
-      .text(HELP_BUTTON_X, HELP_BUTTON_Y, "[ ? ]", {
-        fontSize: `${13 * WORLD_SCALE}px`,
-        color: "#4a4a6a",
-        backgroundColor: "#1a1a2e",
-        padding: { x: 6 * WORLD_SCALE, y: 3 * WORLD_SCALE },
+      .text(width - 12 * WORLD_SCALE, HELP_BUTTON_Y, "[ ? How to Play ]", {
+        fontSize: `${16 * WORLD_SCALE}px`,
+        color: "#ffdd44",
+        backgroundColor: "#333355",
+        padding: { x: 10 * WORLD_SCALE, y: 6 * WORLD_SCALE },
       })
-      .setOrigin(0.5)
+      .setOrigin(1, 0.5)
       .setInteractive({ useHandCursor: true })
       .setDepth(10);
 
-    helpButton.on("pointerover", () => helpButton.setColor("#8888aa"));
-    helpButton.on("pointerout", () => helpButton.setColor("#4a4a6a"));
+    helpButton.on("pointerover", () => helpButton.setColor("#ffffff"));
+    helpButton.on("pointerout", () => helpButton.setColor("#ffdd44"));
     helpButton.on("pointerdown", () => this.showHelpOverlay());
 
     void height;
@@ -273,7 +274,9 @@ export class SetupScene extends Phaser.Scene {
     const bg = this.add
       .rectangle(width / 2, height / 2, width, height, 0x000000, 0.88)
       .setDepth(depth)
-      .setVisible(false);
+      .setVisible(false)
+      .setInteractive({ useHandCursor: false });
+    bg.on("pointerdown", () => this.hideHelpOverlay());
     elements.push(bg);
 
     const title = this.add
@@ -314,10 +317,10 @@ export class SetupScene extends Phaser.Scene {
         fontSize: 15,
       },
       { text: "Claim it for 5 points.", y: 485, fontSize: 15 },
-      { text: "Match Timer", y: 535, fontSize: 20 },
+      { text: "Match Timer", y: 510, fontSize: 20 },
       {
         text: "90 seconds. Highest score when time runs out wins.",
-        y: 565,
+        y: 535,
         fontSize: 15,
       },
     ];
@@ -335,7 +338,7 @@ export class SetupScene extends Phaser.Scene {
     }
 
     const gotIt = this.add
-      .text(width / 2, 620 * WORLD_SCALE, "[ Got it ]", {
+      .text(width / 2, 575 * WORLD_SCALE, "[ Got it ]", {
         fontSize: `${20 * WORLD_SCALE}px`,
         color: "#44ff44",
         backgroundColor: "#333355",

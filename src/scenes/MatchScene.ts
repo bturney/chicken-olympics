@@ -131,6 +131,7 @@ export class MatchScene extends Phaser.Scene {
 
     this.match = new Match({
       spotCount: FARMYARD_LAYOUT.hidingSpots.length,
+      spotPositions: FARMYARD_LAYOUT.hidingSpots,
       playerSlotCount: this.playerSlotCount,
       random: () => Math.random(),
     });

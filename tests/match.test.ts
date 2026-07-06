@@ -195,6 +195,29 @@ describe("Match", () => {
     ).not.toContain(claimedSpot);
   });
 
+  it("uses injected Hiding Spot geometry when choosing a refill spot", () => {
+    const match = new Match({
+      durationMs: 10_000,
+      spotCount: 5,
+      spotPositions: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+        { x: 100, y: 0 },
+        { x: 10, y: 0 },
+      ],
+      random: constantRandom(0),
+    });
+
+    match.advance(0);
+    match.claim(0, 0);
+    match.advance(NORMAL_REFILL_MIN_MS);
+
+    expect(match.view().normalChicks.map((chick) => chick.spotIndex)).toEqual([
+      2, 3, 4,
+    ]);
+  });
+
   it("shows the Green Chick once in its schedule window without reusing a normal chick spot", () => {
     const match = new Match({
       durationMs: 9_000,

@@ -866,7 +866,16 @@ describe("selectFreeSpotIndex", () => {
       recentSpotIndices: [1, 0],
     };
 
-    expect(selectFreeSpotIndex(state, 0, 6, 0)).toBe(4);
+    expect(
+      selectFreeSpotIndex(state, 0, 6, 0, [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 20, y: 0 },
+        { x: 30, y: 0 },
+        { x: 100, y: 0 },
+        { x: 40, y: 0 },
+      ]),
+    ).toBe(4);
   });
 });
 

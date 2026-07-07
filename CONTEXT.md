@@ -127,3 +127,11 @@ _Avoid_: Score explosion, combo UI, damage number
 **Silly-Triumphant Claim Beat**:
 A claim beat where the chick gives a playful hop, spin, chirp, or poof without making the claim feel aggressive. Normal claims keep this lightweight; the green chick claim may add a crowd-cheer layer because it is rare.
 _Avoid_: Attack, defeat, combat hit
+
+**Match Presentation Feedback**:
+The scene-local module that owns all claim-triggered feedback timing — normal claim beat, green chick claim beat, claim score echo, and score bump — behind a single `update(events, elapsedMs)` interface that returns declarative feedback commands. Scenes apply commands; the module never creates Phaser objects.
+_Avoid_: Feedback manager, animation controller, presentation layer
+
+**Feedback Command**:
+A declarative data object the presentation feedback module returns to tell the scene what to render or play. Variants include normalClaimBeat (with computed scale), greenClaimBeat (with progress), claimScoreEcho, scoreBump, and sfx.
+_Avoid_: Signal, callback, event

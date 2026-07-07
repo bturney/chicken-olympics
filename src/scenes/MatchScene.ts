@@ -1,11 +1,9 @@
 import Phaser from "phaser";
 import {
-  computeClaimPopScale,
   NORMAL_PEEK_COUNT,
-  NORMAL_CHICK_POINTS,
   type PlayerSlotCount,
 } from "../match/rules";
-import { Match, type MatchEvent } from "../match/match";
+import { Match } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
 import {
   createBotChickenController,
@@ -32,7 +30,10 @@ import {
   type SceneAudioAdapter,
   type SceneAudioSource,
 } from "../audio/scene-audio";
-import { MatchPresentationFeedback } from "./MatchPresentationFeedback";
+import {
+  MatchPresentationFeedback,
+  type FeedbackCommand,
+} from "./MatchPresentationFeedback";
 import {
   MATCH_SLICE_ASSET_KEYS,
   preloadMatchSliceRuntimeAssets,
@@ -59,19 +60,7 @@ const PLAYER_SIZE = 28 * WORLD_SCALE;
 const CHICK_SIZE = 16 * WORLD_SCALE;
 const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
-interface ClaimScoreEcho {
-  text: Phaser.GameObjects.Text;
-}
-
-interface GreenClaimBeat {
-  spotIndex: number;
-  playerIndex: number;
-  startedAtMs: number;
-}
-
 const GREEN_CHICK_VISIBLE_SCALE = 1.35;
-const GREEN_CLAIM_BEAT_DURATION_MS = 850;
-const GREEN_CLAIM_BEAT_PEAK_SCALE = 2.8;
 
 export class MatchScene extends Phaser.Scene {
   private match!: Match;
@@ -101,8 +90,7 @@ export class MatchScene extends Phaser.Scene {
   get playedSfx(): readonly MatchSfxId[] {
     return this.audio.played;
   }
-  readonly claimScoreEchoes: ClaimScoreEcho[] = [];
-  private greenClaimBeat: GreenClaimBeat | null = null;
+  private feedbackCommands: FeedbackCommand[] = [];
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -135,7 +123,17 @@ export class MatchScene extends Phaser.Scene {
       playerSlotCount: this.playerSlotCount,
       random: () => Math.random(),
     });
-    this.presentationFeedback = new MatchPresentationFeedback();
+    this.presentationFeedback = new MatchPresentationFeedback({
+      spotPositions: FARMYARD_LAYOUT.hidingSpots,
+      playerHexColors: {
+        0: getPlayerChickenHex(this.p1Color),
+        1: getPlayerChickenHex(this.p2Color),
+      },
+      playerCssColors: {
+        0: getPlayerChickenCssHex(this.p1Color),
+        1: getPlayerChickenCssHex(this.p2Color),
+      },
+    });
     this.transitioned = false;
     this.chickBodies = [];
     this.botControllers = new Map(
@@ -160,7 +158,12 @@ export class MatchScene extends Phaser.Scene {
     this.createOverlaps();
     this.drawBounds();
 
-    this.handleMatchEvents(this.match.advance(0));
+    this.match.advance(0);
+    this.feedbackCommands = this.presentationFeedback.update(
+      [],
+      this.match.view().elapsedMs,
+    );
+    this.applyFeedbackCommands();
     this.renderChicks();
     this.renderGreenChick();
   }
@@ -169,11 +172,13 @@ export class MatchScene extends Phaser.Scene {
     if (this.transitioned) return;
 
     this.handleMovement();
-    this.handleMatchEvents(this.match.advance(delta));
-    this.presentationFeedback.tick(this.match.view().elapsedMs);
+    const events = this.match.advance(delta);
+    this.feedbackCommands = this.presentationFeedback.update(
+      events,
+      this.match.view().elapsedMs,
+    );
+    this.applyFeedbackCommands();
     this.updatePlayerChickenPersonality(this.match.view().elapsedMs);
-    this.tickGreenClaimBeat();
-    this.cleanupClaimScoreEchoes();
     this.renderChicks();
     this.renderPeekAnticipations();
     this.renderGreenChick();
@@ -205,36 +210,21 @@ export class MatchScene extends Phaser.Scene {
     this.audio.play(id, MATCH_SFX_MOMENTS[id]);
   }
 
-  private handleMatchEvents(events: MatchEvent[]): void {
-    for (const event of events) {
-      switch (event.type) {
-        case "normalChickClaimed":
-          this.presentationFeedback.startClaimAnimation(
-            event.slotIndex,
-            event.spotIndex,
-            event.playerIndex,
-            this.match.view().elapsedMs,
-          );
+  private applyFeedbackCommands(): void {
+    for (const command of this.feedbackCommands) {
+      switch (command.type) {
+        case "claimScoreEcho":
           this.spawnClaimScoreEcho(
-            event.spotIndex,
-            event.playerIndex,
-            NORMAL_CHICK_POINTS,
+            command.spotIndex,
+            command.points,
+            command.cssColor,
           );
-          this.bumpScoreText(event.playerIndex);
-          this.playSfx("normalClaim");
           break;
-        case "greenChickAppeared":
-          this.playSfx("greenChickAppear");
+        case "scoreBump":
+          this.bumpScoreText(command.playerIndex);
           break;
-        case "greenChickClaimed":
-          this.startGreenClaimBeat(
-            event.spotIndex,
-            event.playerIndex,
-            this.match.view().elapsedMs,
-          );
-          this.playSfx("greenChickClaim");
-          break;
-        case "greenChickMissed":
+        case "sfx":
+          this.playSfx(command.id);
           break;
       }
     }
@@ -505,7 +495,12 @@ export class MatchScene extends Phaser.Scene {
       .normalChicks.find((visible) => visible.slotIndex === slotIndex);
     if (!chick) return;
 
-    this.handleMatchEvents(this.match.claim(chick.spotIndex, playerIndex));
+    const events = this.match.claim(chick.spotIndex, playerIndex);
+    this.feedbackCommands = this.presentationFeedback.update(
+      events,
+      this.match.view().elapsedMs,
+    );
+    this.applyFeedbackCommands();
     this.updateHUD();
   }
 
@@ -514,14 +509,19 @@ export class MatchScene extends Phaser.Scene {
     const greenChick = this.match.view().greenChick;
     if (!greenChick) return;
 
-    this.handleMatchEvents(this.match.claim(greenChick.spotIndex, playerIndex));
+    const events = this.match.claim(greenChick.spotIndex, playerIndex);
+    this.feedbackCommands = this.presentationFeedback.update(
+      events,
+      this.match.view().elapsedMs,
+    );
+    this.applyFeedbackCommands();
     this.updateHUD();
   }
 
   private spawnClaimScoreEcho(
     spotIndex: number,
-    playerIndex: number,
     points: number,
+    cssColor: string,
   ): void {
     const spot = FARMYARD_LAYOUT.hidingSpots[spotIndex];
     if (!spot) return;
@@ -529,9 +529,7 @@ export class MatchScene extends Phaser.Scene {
     const echo = this.add
       .text(spot.x, spot.y - 18 * WORLD_SCALE, `+${points}`, {
         fontSize: `${18 * WORLD_SCALE}px`,
-        color: getPlayerChickenCssHex(
-          playerIndex === 0 ? this.p1Color : this.p2Color,
-        ),
+        color: cssColor,
         stroke: "#000000",
         strokeThickness: 3,
       })
@@ -539,7 +537,6 @@ export class MatchScene extends Phaser.Scene {
       .setDepth(20);
 
     echo.setData("expiresAtMs", this.match.view().elapsedMs + 650);
-    this.claimScoreEchoes.push({ text: echo });
 
     this.tweens.add({
       targets: echo,
@@ -548,7 +545,7 @@ export class MatchScene extends Phaser.Scene {
       duration: 650,
       ease: "Quad.Out",
       onComplete: () => {
-        this.removeClaimScoreEcho(echo);
+        echo.destroy();
       },
     });
   }
@@ -564,25 +561,6 @@ export class MatchScene extends Phaser.Scene {
       duration: 180,
       ease: "Quad.Out",
     });
-  }
-
-  private cleanupClaimScoreEchoes(): void {
-    const now = this.match.view().elapsedMs;
-    for (const echo of [...this.claimScoreEchoes]) {
-      const expiresAtMs: unknown = echo.text.getData("expiresAtMs");
-      if (typeof expiresAtMs === "number" && now >= expiresAtMs) {
-        this.removeClaimScoreEcho(echo.text);
-      }
-    }
-  }
-
-  private removeClaimScoreEcho(text: Phaser.GameObjects.Text): void {
-    const index = this.claimScoreEchoes.findIndex((echo) => echo.text === text);
-    if (index !== -1) {
-      this.claimScoreEchoes.splice(index, 1);
-    }
-    if (!text.scene) return;
-    text.destroy();
   }
 
   private createHidingSpots(): void {
@@ -834,21 +812,16 @@ export class MatchScene extends Phaser.Scene {
       const visibleChick = view.normalChicks.find(
         (chick) => chick.slotIndex === slotIndex,
       );
-      const claimAnimation = this.presentationFeedback.getActiveClaimAnimation(
-        slotIndex,
-        view.elapsedMs,
+      const beat = this.feedbackCommands.find(
+        (c): c is Extract<FeedbackCommand, { type: "normalClaimBeat" }> =>
+          c.type === "normalClaimBeat" && c.slotIndex === slotIndex,
       );
 
-      if (claimAnimation !== null) {
-        const spot = FARMYARD_LAYOUT.hidingSpots[claimAnimation.spotIndex]!;
-        const color = this.getPlayerColor(claimAnimation.playerIndex);
-        const scale = computeClaimPopScale(
-          claimAnimation.startedAtMs,
-          view.elapsedMs,
-        );
+      if (beat) {
+        const spot = FARMYARD_LAYOUT.hidingSpots[beat.spotIndex]!;
         body.setPosition(spot.x, spot.y);
-        body.setTint(color).setTintMode(Phaser.TintModes.FILL);
-        body.setScale(scale);
+        body.setTint(beat.hexColor).setTintMode(Phaser.TintModes.FILL);
+        body.setScale(beat.scale);
         body.body!.enable = false;
         body.setVisible(true);
       } else if (visibleChick) {
@@ -900,27 +873,27 @@ export class MatchScene extends Phaser.Scene {
 
   private renderGreenChick(): void {
     const view = this.match.view();
-    const greenClaimBeat = this.greenClaimBeat;
+    const greenBeat = this.feedbackCommands.find(
+      (c): c is Extract<FeedbackCommand, { type: "greenClaimBeat" }> =>
+        c.type === "greenClaimBeat",
+    );
 
-    if (greenClaimBeat !== null) {
-      const spot =
-        FARMYARD_LAYOUT.hidingSpots[greenClaimBeat.spotIndex] ?? null;
+    if (greenBeat) {
+      const spot = FARMYARD_LAYOUT.hidingSpots[greenBeat.spotIndex] ?? null;
       if (!spot) return;
 
-      const scale = this.computeGreenClaimBeatScale(
-        greenClaimBeat.startedAtMs,
-        view.elapsedMs,
-      );
       this.greenChickBody.setPosition(spot.x, spot.y);
       this.greenChickBody
-        .setTint(this.getPlayerColor(greenClaimBeat.playerIndex))
+        .setTint(greenBeat.hexColor)
         .setTintMode(Phaser.TintModes.FILL);
-      this.greenChickBody.setScale(scale);
+      this.greenChickBody.setScale(greenBeat.scale);
       this.greenChickBody.body!.enable = false;
       this.greenChickBody.setVisible(true);
-      this.renderGreenClaimBurst(spot.x, spot.y, scale, view.elapsedMs);
+      this.renderGreenClaimBurst(spot.x, spot.y, greenBeat);
       return;
     }
+
+    this.greenClaimBurstLayer.clear();
 
     const activeSpot = view.greenChick?.spotIndex ?? null;
 
@@ -942,61 +915,21 @@ export class MatchScene extends Phaser.Scene {
     this.greenChickBody.setVisible(true);
   }
 
-  private startGreenClaimBeat(
-    spotIndex: number,
-    playerIndex: number,
-    now: number,
-  ): void {
-    this.greenClaimBeat = { spotIndex, playerIndex, startedAtMs: now };
-  }
-
-  private tickGreenClaimBeat(): void {
-    const beat = this.greenClaimBeat;
-    if (beat === null) return;
-
-    if (
-      this.match.view().elapsedMs - beat.startedAtMs >=
-      GREEN_CLAIM_BEAT_DURATION_MS
-    ) {
-      this.greenClaimBeat = null;
-      this.greenClaimBurstLayer.clear();
-    }
-  }
-
-  private computeGreenClaimBeatScale(startedAtMs: number, now: number): number {
-    if (now <= startedAtMs) return 1;
-    const elapsed = now - startedAtMs;
-    if (elapsed >= GREEN_CLAIM_BEAT_DURATION_MS) return 0;
-    const progress = elapsed / GREEN_CLAIM_BEAT_DURATION_MS;
-    if (progress < 0.45) {
-      return 1 + (progress / 0.45) * (GREEN_CLAIM_BEAT_PEAK_SCALE - 1);
-    }
-    return GREEN_CLAIM_BEAT_PEAK_SCALE * (1 - (progress - 0.45) / 0.55);
-  }
-
   private renderGreenClaimBurst(
     x: number,
     y: number,
-    scale: number,
-    now: number,
+    beat: Extract<FeedbackCommand, { type: "greenClaimBeat" }>,
   ): void {
-    const beat = this.greenClaimBeat;
-    if (beat === null) return;
-
-    const progress = Math.min(
-      1,
-      (now - beat.startedAtMs) / GREEN_CLAIM_BEAT_DURATION_MS,
-    );
+    const { progress, scale, hexColor } = beat;
     const burstRadius = 26 * WORLD_SCALE + progress * 54 * WORLD_SCALE;
     const burstAlpha = 0.72 * (1 - progress);
-    const playerColor = this.getPlayerColor(beat.playerIndex);
 
     this.greenClaimBurstLayer.clear();
-    this.greenClaimBurstLayer.lineStyle(7, playerColor, burstAlpha);
+    this.greenClaimBurstLayer.lineStyle(7, hexColor, burstAlpha);
     this.greenClaimBurstLayer.strokeCircle(x, y, burstRadius * scale);
     this.greenClaimBurstLayer.lineStyle(4, 0xffffff, burstAlpha * 0.9);
     this.greenClaimBurstLayer.strokeCircle(x, y, burstRadius * 0.66 * scale);
-    this.greenClaimBurstLayer.fillStyle(playerColor, burstAlpha * 0.28);
+    this.greenClaimBurstLayer.fillStyle(hexColor, burstAlpha * 0.28);
     this.greenClaimBurstLayer.fillCircle(x, y, burstRadius * 0.42 * scale);
 
     for (let i = 0; i < 8; i++) {
@@ -1005,7 +938,7 @@ export class MatchScene extends Phaser.Scene {
       const outer = burstRadius * 0.95 * scale;
       this.greenClaimBurstLayer.lineStyle(
         3,
-        i % 2 === 0 ? 0xffffff : playerColor,
+        i % 2 === 0 ? 0xffffff : hexColor,
         burstAlpha,
       );
       this.greenClaimBurstLayer.beginPath();
@@ -1019,10 +952,6 @@ export class MatchScene extends Phaser.Scene {
       );
       this.greenClaimBurstLayer.strokePath();
     }
-  }
-
-  private getPlayerColor(playerIndex: number): number {
-    return getPlayerChickenHex(playerIndex === 0 ? this.p1Color : this.p2Color);
   }
 
   private drawBounds(): void {

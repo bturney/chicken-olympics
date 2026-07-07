@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   PLAYER_CHICKEN_COLORS,
   availableColors,
+  botColor,
   canStartMatch,
   getPlayerChickenColorLabel,
   getPlayerChickenCssHex,
@@ -153,5 +154,33 @@ describe("canStartMatch", () => {
     const selection: SetupSelection = { p1: "blue", p2: "blue" };
 
     expect(canStartMatch(selection)).toBe(false);
+  });
+});
+
+describe("botColor", () => {
+  it("returns a valid player chicken color when P1 has not chosen yet", () => {
+    const color = botColor(null);
+
+    expect(PLAYER_CHICKEN_COLORS).toContainEqual(color);
+  });
+
+  it("returns a color different from P1's pick when P1 has chosen", () => {
+    for (const p1Pick of PLAYER_CHICKEN_COLORS) {
+      const color = botColor(p1Pick);
+
+      expect(color).not.toBe(p1Pick);
+      expect(PLAYER_CHICKEN_COLORS).toContainEqual(color);
+    }
+  });
+
+  it("is deterministic for the same P1 pick", () => {
+    for (const p1Pick of PLAYER_CHICKEN_COLORS) {
+      expect(botColor(p1Pick)).toBe(botColor(p1Pick));
+    }
+  });
+
+  it("returns the same default color regardless of unset P1", () => {
+    expect(botColor(null)).toBe(botColor(null));
+    expect(PLAYER_CHICKEN_COLORS).toContainEqual(botColor(null));
   });
 });

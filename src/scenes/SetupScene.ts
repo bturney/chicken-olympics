@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import {
   PLAYER_CHICKEN_COLORS,
   availableColors,
+  botColor,
   canStartMatch,
   getPlayerChickenColorLabel,
   getPlayerChickenCssHex,
@@ -41,7 +42,6 @@ export class SetupScene extends Phaser.Scene {
   private startButton!: Phaser.GameObjects.Text;
   private p2Toggle!: Phaser.GameObjects.Text;
   private p2IsBot = false;
-  private p2BotColor = "green";
   private helpOverlayElements: { setVisible(v: boolean): void }[] = [];
 
   constructor() {
@@ -52,7 +52,6 @@ export class SetupScene extends Phaser.Scene {
     this.selection = { p1: null, p2: null };
     this.swatches = [];
     this.p2IsBot = false;
-    this.p2BotColor = "green";
 
     const { width } = this.scale;
 
@@ -252,7 +251,9 @@ export class SetupScene extends Phaser.Scene {
         const botSlots = this.p2IsBot ? [1] : [];
         const sceneData: MatchSceneData = {
           p1Color: this.selection.p1 ?? undefined,
-          p2Color: this.p2IsBot ? undefined : (this.selection.p2 ?? undefined),
+          p2Color: this.p2IsBot
+            ? botColor(this.selection.p1)
+            : (this.selection.p2 ?? undefined),
           playerSlotCount: 2,
           botSlots,
         };

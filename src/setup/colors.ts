@@ -49,6 +49,12 @@ export function availableColors(
   return PLAYER_CHICKEN_COLORS.filter((c) => c !== otherPick);
 }
 
+export function botColor(p1Pick: PlayerChickenColor | null): PlayerChickenColor {
+  if (p1Pick === null) return "orange";
+  const idx = PLAYER_CHICKEN_COLORS.indexOf(p1Pick);
+  return PLAYER_CHICKEN_COLORS[(idx + 1) % PLAYER_CHICKEN_COLORS.length]!;
+}
+
 export function canStartMatch(selection: SetupSelection): boolean {
   if (selection.p1 === null) return false;
   if (selection.p2 === null) return true;

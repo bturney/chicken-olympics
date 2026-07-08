@@ -40,18 +40,23 @@ import {
 } from "../src/match/playtestMenuManager";
 
 describe("FIELDS", () => {
-  it("has all 13 tuning fields", () => {
-    expect(FIELDS).toHaveLength(13);
+  it("has all 18 tuning fields", () => {
+    expect(FIELDS).toHaveLength(18);
   });
 
-  it("includes player speed and bot speed as live-applicable fields", () => {
-    const playerSpeedField = FIELDS.find((f) => f.key === "playerSpeed");
-    expect(playerSpeedField).toBeDefined();
-    expect(playerSpeedField!.restartRequired).toBe(false);
-
-    const botSpeedField = FIELDS.find((f) => f.key === "botSpeed");
-    expect(botSpeedField).toBeDefined();
-    expect(botSpeedField!.restartRequired).toBe(false);
+  it("includes bot indecision fields as live-applicable", () => {
+    const checkLive = (key: string) => {
+      const field = FIELDS.find((f) => f.key === key);
+      expect(field).toBeDefined();
+      expect(field!.restartRequired).toBe(false);
+    };
+    checkLive("playerSpeed");
+    checkLive("botSpeed");
+    checkLive("reactionDelayMinMs");
+    checkLive("reactionDelayMaxMs");
+    checkLive("indecisionChance");
+    checkLive("indecisionDurationMs");
+    checkLive("farTargetChance");
   });
 });
 

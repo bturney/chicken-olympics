@@ -14,6 +14,11 @@ export interface PlaytestTuning {
   greenChickScheduleMaxMs: number;
   playerSpeed: number;
   botSpeed: number;
+  reactionDelayMinMs: number;
+  reactionDelayMaxMs: number;
+  indecisionChance: number;
+  indecisionDurationMs: number;
+  farTargetChance: number;
 }
 
 export const PRODUCTION_TUNING: PlaytestTuning = {
@@ -30,6 +35,11 @@ export const PRODUCTION_TUNING: PlaytestTuning = {
   greenChickScheduleMaxMs: 70_000,
   playerSpeed: 400,
   botSpeed: 400,
+  reactionDelayMinMs: 300,
+  reactionDelayMaxMs: 550,
+  indecisionChance: 0.25,
+  indecisionDurationMs: 120,
+  farTargetChance: 0.15,
 };
 
 export interface TuningDraft {
@@ -90,6 +100,27 @@ export function parseDurationMs(input: string): number | null {
 
 export function formatDurationMs(ms: number): string {
   return `${ms}ms`;
+}
+
+export function parseChance(input: string): number | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return null;
+
+  const percentMatch = trimmed.match(/^(\d+(?:\.\d+)?)%$/);
+  if (percentMatch) {
+    const val = parseFloat(percentMatch[1]!);
+    if (!Number.isFinite(val) || val < 0 || val > 100) return null;
+    return val / 100;
+  }
+
+  const decimalMatch = trimmed.match(/^(\d+(?:\.\d+)?)$/);
+  if (decimalMatch) {
+    const val = parseFloat(decimalMatch[1]!);
+    if (!Number.isFinite(val) || val < 0 || val > 1) return null;
+    return val;
+  }
+
+  return null;
 }
 
 export function parseSpeed(input: string, productionDefault: number): number | null {
@@ -222,6 +253,42 @@ export function validateTuning(tuning: PlaytestTuning): ValidationError[] {
       message: "Must be a non-negative finite number",
     });
   }
+  if (!isNonNegativeFinite(tuning.reactionDelayMinMs)) {
+    errors.push({
+      field: "reactionDelayMinMs",
+      message: "Must be a non-negative finite number",
+    });
+  }
+  if (!isNonNegativeFinite(tuning.reactionDelayMaxMs)) {
+    errors.push({
+      field: "reactionDelayMaxMs",
+      message: "Must be a non-negative finite number",
+    });
+  }
+  if (tuning.reactionDelayMinMs >= tuning.reactionDelayMaxMs) {
+    errors.push({
+      field: "reactionDelayMaxMs",
+      message: "Reaction delay max must be greater than min",
+    });
+  }
+  if (typeof tuning.indecisionChance !== "number" || !Number.isFinite(tuning.indecisionChance) || tuning.indecisionChance < 0 || tuning.indecisionChance > 1) {
+    errors.push({
+      field: "indecisionChance",
+      message: "Must be a number between 0 and 1",
+    });
+  }
+  if (!isPositiveFinite(tuning.indecisionDurationMs)) {
+    errors.push({
+      field: "indecisionDurationMs",
+      message: "Must be a positive finite number",
+    });
+  }
+  if (typeof tuning.farTargetChance !== "number" || !Number.isFinite(tuning.farTargetChance) || tuning.farTargetChance < 0 || tuning.farTargetChance > 1) {
+    errors.push({
+      field: "farTargetChance",
+      message: "Must be a number between 0 and 1",
+    });
+  }
   return errors;
 }
 
@@ -260,7 +327,12 @@ export function isDefaultTuning(tuning: PlaytestTuning): boolean {
     tuning.greenChickScheduleMinMs === PRODUCTION_TUNING.greenChickScheduleMinMs &&
     tuning.greenChickScheduleMaxMs === PRODUCTION_TUNING.greenChickScheduleMaxMs &&
     tuning.playerSpeed === PRODUCTION_TUNING.playerSpeed &&
-    tuning.botSpeed === PRODUCTION_TUNING.botSpeed
+    tuning.botSpeed === PRODUCTION_TUNING.botSpeed &&
+    tuning.reactionDelayMinMs === PRODUCTION_TUNING.reactionDelayMinMs &&
+    tuning.reactionDelayMaxMs === PRODUCTION_TUNING.reactionDelayMaxMs &&
+    tuning.indecisionChance === PRODUCTION_TUNING.indecisionChance &&
+    tuning.indecisionDurationMs === PRODUCTION_TUNING.indecisionDurationMs &&
+    tuning.farTargetChance === PRODUCTION_TUNING.farTargetChance
   );
 }
 
@@ -294,6 +366,11 @@ export function loadTuning(): PlaytestTuning | null {
       greenChickScheduleMaxMs: typeof c.greenChickScheduleMaxMs === "number" && Number.isFinite(c.greenChickScheduleMaxMs) && c.greenChickScheduleMaxMs > 0 ? c.greenChickScheduleMaxMs : PRODUCTION_TUNING.greenChickScheduleMaxMs,
       playerSpeed: typeof c.playerSpeed === "number" && Number.isFinite(c.playerSpeed) && c.playerSpeed >= 0 ? c.playerSpeed : PRODUCTION_TUNING.playerSpeed,
       botSpeed: typeof c.botSpeed === "number" && Number.isFinite(c.botSpeed) && c.botSpeed >= 0 ? c.botSpeed : PRODUCTION_TUNING.botSpeed,
+      reactionDelayMinMs: typeof c.reactionDelayMinMs === "number" && Number.isFinite(c.reactionDelayMinMs) && c.reactionDelayMinMs >= 0 ? c.reactionDelayMinMs : PRODUCTION_TUNING.reactionDelayMinMs,
+      reactionDelayMaxMs: typeof c.reactionDelayMaxMs === "number" && Number.isFinite(c.reactionDelayMaxMs) && c.reactionDelayMaxMs >= 0 ? c.reactionDelayMaxMs : PRODUCTION_TUNING.reactionDelayMaxMs,
+      indecisionChance: typeof c.indecisionChance === "number" && Number.isFinite(c.indecisionChance) && c.indecisionChance >= 0 && c.indecisionChance <= 1 ? c.indecisionChance : PRODUCTION_TUNING.indecisionChance,
+      indecisionDurationMs: typeof c.indecisionDurationMs === "number" && Number.isFinite(c.indecisionDurationMs) && c.indecisionDurationMs > 0 ? c.indecisionDurationMs : PRODUCTION_TUNING.indecisionDurationMs,
+      farTargetChance: typeof c.farTargetChance === "number" && Number.isFinite(c.farTargetChance) && c.farTargetChance >= 0 && c.farTargetChance <= 1 ? c.farTargetChance : PRODUCTION_TUNING.farTargetChance,
     };
   } catch {
     return null;

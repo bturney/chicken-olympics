@@ -22,6 +22,7 @@ import {
   tickBotChickenController,
   type BotChickenController,
   type BotChickenTarget,
+  type BotChickenConfig,
 } from "../match/botChickenController";
 import { computeMoveVelocity } from "../match/movement";
 import {
@@ -977,6 +978,17 @@ export class MatchScene extends Phaser.Scene {
     return this.menuState.draft.applied.botSpeed;
   }
 
+  private get botIndecisionConfig(): BotChickenConfig {
+    const a = this.menuState.draft.applied;
+    return {
+      reactionDelayMinMs: a.reactionDelayMinMs,
+      reactionDelayMaxMs: a.reactionDelayMaxMs,
+      indecisionChance: a.indecisionChance,
+      indecisionDurationMs: a.indecisionDurationMs,
+      farTargetChance: a.farTargetChance,
+    };
+  }
+
   private handleMovement(): void {
     const p1IsBot = this.botSlots.includes(0);
     if (!p1IsBot) {
@@ -1026,6 +1038,7 @@ export class MatchScene extends Phaser.Scene {
       elapsedMs: this.match.view().elapsedMs,
       speed: this.botSpeed,
       visibleTargets: this.getVisibleBotTargets(),
+      config: this.botIndecisionConfig,
     });
     this.botControllers.set(playerIndex, result.controller);
     chicken.setVelocity(result.velocity.vx, result.velocity.vy);

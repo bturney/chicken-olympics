@@ -9,6 +9,7 @@ import {
   parseDurationMs,
   parseCount,
   parseBoolean,
+  parseChance,
   parseSpeed,
   formatDurationMs,
   PRODUCTION_TUNING,
@@ -51,6 +52,12 @@ export function parseSpeedField(raw: string, productionDefault: number): { parse
   return { parsed: val, error: null };
 }
 
+export function parseChanceField(raw: string): { parsed: unknown; error: string | null } {
+  const val = parseChance(raw);
+  if (val === null) return { parsed: null, error: "Invalid chance; use decimal (0-1) or percent (0%-100%)" };
+  return { parsed: val, error: null };
+}
+
 export function formatFieldValue(key: string, tuning: PlaytestTuning): string {
   const tuningRecord = tuning as unknown as Record<string, unknown>;
   const val = tuningRecord[key];
@@ -75,6 +82,11 @@ export const FIELDS: FieldDef[] = [
   { key: "greenChickScheduleMaxMs", label: "Green Chick schedule max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
   { key: "playerSpeed", label: "Player Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.playerSpeed) },
   { key: "botSpeed", label: "Bot Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.botSpeed) },
+  { key: "reactionDelayMinMs", label: "Bot Reaction Delay min", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
+  { key: "reactionDelayMaxMs", label: "Bot Reaction Delay max", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
+  { key: "indecisionChance", label: "Bot Indecision chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField },
+  { key: "indecisionDurationMs", label: "Bot Indecision duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
+  { key: "farTargetChance", label: "Bot Far Target chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField },
 ];
 
 function buildFieldValues(tuning: PlaytestTuning): string[] {

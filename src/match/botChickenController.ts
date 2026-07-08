@@ -1,3 +1,19 @@
+export interface BotChickenConfig {
+  reactionDelayMinMs: number;
+  reactionDelayMaxMs: number;
+  indecisionChance: number;
+  indecisionDurationMs: number;
+  farTargetChance: number;
+}
+
+export const PRODUCTION_BOT_CHICKEN_CONFIG: BotChickenConfig = {
+  reactionDelayMinMs: 300,
+  reactionDelayMaxMs: 550,
+  indecisionChance: 0.25,
+  indecisionDurationMs: 120,
+  farTargetChance: 0.15,
+};
+
 export interface BotChickenController {
   targetSpotIndex: number | null;
   targetChosenAtMs: number;
@@ -17,17 +33,13 @@ export interface BotChickenTickInput {
   elapsedMs: number;
   speed: number;
   visibleTargets: readonly BotChickenTarget[];
+  config?: Partial<BotChickenConfig>;
 }
 
 export interface BotChickenTickResult {
   controller: BotChickenController;
   velocity: { vx: number; vy: number };
 }
-
-const MIN_REACTION_DELAY_MS = 300;
-const REACTION_DELAY_RANGE_MS = 250;
-const INDECISION_DURATION_MS = 120;
-const INDECISION_CHANCE = 0.25;
 
 export function createBotChickenController(options?: {
   random?: () => number;
@@ -41,11 +53,16 @@ export function createBotChickenController(options?: {
   };
 }
 
+function resolveConfig(input: BotChickenTickInput): BotChickenConfig {
+  return { ...PRODUCTION_BOT_CHICKEN_CONFIG, ...input.config };
+}
+
 export function tickBotChickenController(
   controller: BotChickenController,
   input: BotChickenTickInput,
 ): BotChickenTickResult {
-  const target = chooseTarget(controller, input);
+  const config = resolveConfig(input);
+  const target = chooseTarget(controller, input, config);
   if (target === null) {
     return {
       controller: { ...controller, targetSpotIndex: null },
@@ -56,7 +73,7 @@ export function tickBotChickenController(
   const nextController =
     target.spotIndex === controller.targetSpotIndex
       ? controller
-      : chooseNewTarget(controller, target.spotIndex, input.elapsedMs);
+      : chooseNewTarget(controller, target.spotIndex, input.elapsedMs, config);
 
   if (
     input.elapsedMs - nextController.targetChosenAtMs <
@@ -86,17 +103,19 @@ function chooseNewTarget(
   controller: BotChickenController,
   spotIndex: number,
   elapsedMs: number,
+  config: BotChickenConfig,
 ): BotChickenController {
+  const range = config.reactionDelayMaxMs - config.reactionDelayMinMs;
   const reactionDelayMs =
-    MIN_REACTION_DELAY_MS + controller.random() * REACTION_DELAY_RANGE_MS;
+    config.reactionDelayMinMs + controller.random() * range;
   return {
     ...controller,
     targetSpotIndex: spotIndex,
     targetChosenAtMs: elapsedMs,
     reactionDelayMs,
     indecisionEndsAtMs:
-      controller.random() > 1 - INDECISION_CHANCE
-        ? elapsedMs + reactionDelayMs + INDECISION_DURATION_MS
+      controller.random() > 1 - config.indecisionChance
+        ? elapsedMs + reactionDelayMs + config.indecisionDurationMs
         : 0,
   };
 }
@@ -104,6 +123,7 @@ function chooseNewTarget(
 function chooseTarget(
   controller: BotChickenController,
   input: BotChickenTickInput,
+  config: BotChickenConfig,
 ): BotChickenTarget | null {
   const currentTarget = input.visibleTargets.find(
     (target) => target.spotIndex === controller.targetSpotIndex,
@@ -114,7 +134,7 @@ function chooseTarget(
       distanceSquared(input.botPosition, a) -
       distanceSquared(input.botPosition, b),
   );
-  if (distanceRanked.length > 1 && controller.random() > 0.85) {
+  if (distanceRanked.length > 1 && controller.random() > 1 - config.farTargetChance) {
     return distanceRanked[distanceRanked.length - 1] ?? null;
   }
   return distanceRanked[0] ?? null;

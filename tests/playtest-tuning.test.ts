@@ -31,6 +31,7 @@ import {
   parseDurationMs,
   parseCount,
   parseBoolean,
+  parseChance,
   parseSpeed,
   formatDurationMs,
   validateTuning,
@@ -69,6 +70,26 @@ describe("PRODUCTION_TUNING", () => {
 
   it("defaults bot speed to 400 px/s", () => {
     expect(PRODUCTION_TUNING.botSpeed).toBe(400);
+  });
+
+  it("defaults reaction delay min to 300 ms", () => {
+    expect(PRODUCTION_TUNING.reactionDelayMinMs).toBe(300);
+  });
+
+  it("defaults reaction delay max to 550 ms", () => {
+    expect(PRODUCTION_TUNING.reactionDelayMaxMs).toBe(550);
+  });
+
+  it("defaults indecision chance to 0.25", () => {
+    expect(PRODUCTION_TUNING.indecisionChance).toBe(0.25);
+  });
+
+  it("defaults indecision duration to 120 ms", () => {
+    expect(PRODUCTION_TUNING.indecisionDurationMs).toBe(120);
+  });
+
+  it("defaults far target chance to 0.15", () => {
+    expect(PRODUCTION_TUNING.farTargetChance).toBe(0.15);
   });
 });
 
@@ -233,6 +254,60 @@ describe("parseSpeed", () => {
   });
 });
 
+describe("parseChance", () => {
+  it("parses a plain decimal between 0 and 1", () => {
+    expect(parseChance("0.25")).toBe(0.25);
+  });
+
+  it("parses zero as a valid chance", () => {
+    expect(parseChance("0")).toBe(0);
+  });
+
+  it("parses one as a valid chance", () => {
+    expect(parseChance("1")).toBe(1);
+  });
+
+  it("parses a percent value", () => {
+    expect(parseChance("25%")).toBe(0.25);
+  });
+
+  it("parses 0%", () => {
+    expect(parseChance("0%")).toBe(0);
+  });
+
+  it("parses 100%", () => {
+    expect(parseChance("100%")).toBe(1);
+  });
+
+  it("returns null for values above 1", () => {
+    expect(parseChance("1.5")).toBeNull();
+  });
+
+  it("returns null for values above 100%", () => {
+    expect(parseChance("150%")).toBeNull();
+  });
+
+  it("returns null for negative decimal", () => {
+    expect(parseChance("-0.5")).toBeNull();
+  });
+
+  it("returns null for negative percent", () => {
+    expect(parseChance("-10%")).toBeNull();
+  });
+
+  it("returns null for non-numeric text", () => {
+    expect(parseChance("abc")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(parseChance("")).toBeNull();
+  });
+
+  it("returns null for infinity", () => {
+    expect(parseChance("Infinity")).toBeNull();
+  });
+});
+
 describe("cloneTuning", () => {
   it("creates an independent copy", () => {
     const copy = cloneTuning(PRODUCTION_TUNING);
@@ -381,6 +456,68 @@ describe("validateTuning", () => {
     const errors = validateTuning(fullTuning({ botSpeed: 0 }));
     expect(errors.some((e) => e.field === "botSpeed")).toBe(false);
   });
+
+  it("rejects negative reactionDelayMinMs", () => {
+    const errors = validateTuning(fullTuning({ reactionDelayMinMs: -100 }));
+    expect(errors.some((e) => e.field === "reactionDelayMinMs")).toBe(true);
+  });
+
+  it("rejects negative reactionDelayMaxMs", () => {
+    const errors = validateTuning(fullTuning({ reactionDelayMaxMs: -100 }));
+    expect(errors.some((e) => e.field === "reactionDelayMaxMs")).toBe(true);
+  });
+
+  it("rejects reaction delay min >= max", () => {
+    const errors = validateTuning(fullTuning({ reactionDelayMinMs: 500, reactionDelayMaxMs: 500 }));
+    expect(errors.some((e) => e.field === "reactionDelayMaxMs")).toBe(true);
+  });
+
+  it("rejects indecisionChance above 1", () => {
+    const errors = validateTuning(fullTuning({ indecisionChance: 1.5 }));
+    expect(errors.some((e) => e.field === "indecisionChance")).toBe(true);
+  });
+
+  it("rejects indecisionChance below 0", () => {
+    const errors = validateTuning(fullTuning({ indecisionChance: -0.1 }));
+    expect(errors.some((e) => e.field === "indecisionChance")).toBe(true);
+  });
+
+  it("rejects NaN indecisionChance", () => {
+    const errors = validateTuning(fullTuning({ indecisionChance: Number.NaN }));
+    expect(errors.some((e) => e.field === "indecisionChance")).toBe(true);
+  });
+
+  it("rejects negative indecisionDurationMs", () => {
+    const errors = validateTuning(fullTuning({ indecisionDurationMs: -10 }));
+    expect(errors.some((e) => e.field === "indecisionDurationMs")).toBe(true);
+  });
+
+  it("rejects zero indecisionDurationMs", () => {
+    const errors = validateTuning(fullTuning({ indecisionDurationMs: 0 }));
+    expect(errors.some((e) => e.field === "indecisionDurationMs")).toBe(true);
+  });
+
+  it("rejects farTargetChance above 1", () => {
+    const errors = validateTuning(fullTuning({ farTargetChance: 1.5 }));
+    expect(errors.some((e) => e.field === "farTargetChance")).toBe(true);
+  });
+
+  it("rejects farTargetChance below 0", () => {
+    const errors = validateTuning(fullTuning({ farTargetChance: -0.1 }));
+    expect(errors.some((e) => e.field === "farTargetChance")).toBe(true);
+  });
+
+  it("accepts zero chance values", () => {
+    const errors = validateTuning(fullTuning({ indecisionChance: 0, farTargetChance: 0 }));
+    expect(errors.some((e) => e.field === "indecisionChance")).toBe(false);
+    expect(errors.some((e) => e.field === "farTargetChance")).toBe(false);
+  });
+
+  it("accepts one chance values", () => {
+    const errors = validateTuning(fullTuning({ indecisionChance: 1, farTargetChance: 1 }));
+    expect(errors.some((e) => e.field === "indecisionChance")).toBe(false);
+    expect(errors.some((e) => e.field === "farTargetChance")).toBe(false);
+  });
 });
 
 describe("commitDraft", () => {
@@ -506,6 +643,40 @@ describe("loadTuning / clearTuning", () => {
     const loaded = loadTuning();
     expect(loaded!.playerSpeed).toBe(PRODUCTION_TUNING.playerSpeed);
   });
+
+  it("loads saved bot indecision fields", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        matchDurationMs: 120_000,
+        reactionDelayMinMs: 500,
+        reactionDelayMaxMs: 1000,
+        indecisionChance: 0.5,
+        indecisionDurationMs: 300,
+        farTargetChance: 0.3,
+      }),
+    );
+    const loaded = loadTuning();
+    expect(loaded!.reactionDelayMinMs).toBe(500);
+    expect(loaded!.reactionDelayMaxMs).toBe(1000);
+    expect(loaded!.indecisionChance).toBe(0.5);
+    expect(loaded!.indecisionDurationMs).toBe(300);
+    expect(loaded!.farTargetChance).toBe(0.3);
+  });
+
+  it("falls back to production bot indecision fields when saved data has invalid value", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        matchDurationMs: 120_000,
+        indecisionChance: "high",
+        farTargetChance: -1,
+      }),
+    );
+    const loaded = loadTuning();
+    expect(loaded!.indecisionChance).toBe(PRODUCTION_TUNING.indecisionChance);
+    expect(loaded!.farTargetChance).toBe(PRODUCTION_TUNING.farTargetChance);
+  });
 });
 
 describe("isDefaultTuning", () => {
@@ -531,6 +702,26 @@ describe("isDefaultTuning", () => {
 
   it("returns false for a non-default bot speed", () => {
     expect(isDefaultTuning(fullTuning({ botSpeed: 200 }))).toBe(false);
+  });
+
+  it("returns false for a non-default reaction delay min", () => {
+    expect(isDefaultTuning(fullTuning({ reactionDelayMinMs: 500 }))).toBe(false);
+  });
+
+  it("returns false for a non-default reaction delay max", () => {
+    expect(isDefaultTuning(fullTuning({ reactionDelayMaxMs: 1000 }))).toBe(false);
+  });
+
+  it("returns false for a non-default indecision chance", () => {
+    expect(isDefaultTuning(fullTuning({ indecisionChance: 0.5 }))).toBe(false);
+  });
+
+  it("returns false for a non-default indecision duration", () => {
+    expect(isDefaultTuning(fullTuning({ indecisionDurationMs: 300 }))).toBe(false);
+  });
+
+  it("returns false for a non-default far target chance", () => {
+    expect(isDefaultTuning(fullTuning({ farTargetChance: 0.5 }))).toBe(false);
   });
 });
 

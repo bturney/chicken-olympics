@@ -55,8 +55,12 @@ export interface TuningDraft {
   applied: PlaytestTuning;
 }
 
-export function createTuningDraft(): TuningDraft {
-  const saved = loadTuning();
+export interface TuningValidationContext {
+  hidingSpotCount?: number;
+}
+
+export function createTuningDraft(context?: TuningValidationContext): TuningDraft {
+  const saved = loadTuning(context);
   const applied = saved ?? PRODUCTION_TUNING;
   return { draft: { ...applied }, applied };
 }
@@ -81,6 +85,13 @@ export function parseBoolean(input: string): boolean | null {
 export function parseDurationMs(input: string): number | null {
   const trimmed = input.trim();
   if (trimmed.length === 0) return null;
+
+  const explicitMsMatch = trimmed.match(/^(-?\d+)ms$/);
+  if (explicitMsMatch) {
+    const val = parseInt(explicitMsMatch[1]!, 10);
+    if (val < 0) return null;
+    return val;
+  }
 
   const msMatch = trimmed.match(/^(-?\d+)$/);
   if (msMatch) {
@@ -169,7 +180,10 @@ function isPositiveInteger(val: unknown): val is number {
   return typeof val === "number" && Number.isFinite(val) && val >= 1 && Number.isInteger(val);
 }
 
-export function validateTuning(tuning: PlaytestTuning): ValidationError[] {
+export function validateTuning(
+  tuning: PlaytestTuning,
+  context: TuningValidationContext = {},
+): ValidationError[] {
   const errors: ValidationError[] = [];
   if (!isPositiveFinite(tuning.matchDurationMs)) {
     errors.push({
@@ -229,6 +243,16 @@ export function validateTuning(tuning: PlaytestTuning): ValidationError[] {
     errors.push({
       field: "normalPeekCount",
       message: "Must be a positive whole number",
+    });
+  }
+  if (
+    context.hidingSpotCount !== undefined &&
+    isPositiveInteger(tuning.normalPeekCount) &&
+    tuning.normalPeekCount > context.hidingSpotCount
+  ) {
+    errors.push({
+      field: "normalPeekCount",
+      message: `Must be no more than ${context.hidingSpotCount} Hiding Spots`,
     });
   }
   if (!isPositiveInteger(tuning.normalChickPoints)) {
@@ -380,7 +404,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function loadTuning(): PlaytestTuning | null {
+export function loadTuning(context?: TuningValidationContext): PlaytestTuning | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -388,7 +412,7 @@ export function loadTuning(): PlaytestTuning | null {
     if (!isRecord(parsed)) return null;
     const c = parsed;
     if (typeof c.matchDurationMs !== "number" || !Number.isFinite(c.matchDurationMs) || c.matchDurationMs <= 0) return null;
-    return {
+    const candidate: PlaytestTuning = {
       matchDurationMs: c.matchDurationMs,
       normalPeekCount: typeof c.normalPeekCount === "number" && Number.isInteger(c.normalPeekCount) && c.normalPeekCount >= 1 ? c.normalPeekCount : PRODUCTION_TUNING.normalPeekCount,
       normalPeekDurationMs: typeof c.normalPeekDurationMs === "number" && Number.isFinite(c.normalPeekDurationMs) && c.normalPeekDurationMs > 0 ? c.normalPeekDurationMs : PRODUCTION_TUNING.normalPeekDurationMs,
@@ -412,6 +436,7 @@ export function loadTuning(): PlaytestTuning | null {
       greenClaimBeatDurationMs: typeof c.greenClaimBeatDurationMs === "number" && Number.isFinite(c.greenClaimBeatDurationMs) && c.greenClaimBeatDurationMs > 0 ? c.greenClaimBeatDurationMs : PRODUCTION_TUNING.greenClaimBeatDurationMs,
       greenClaimBeatPeakScale: typeof c.greenClaimBeatPeakScale === "number" && Number.isFinite(c.greenClaimBeatPeakScale) && c.greenClaimBeatPeakScale >= 0 ? c.greenClaimBeatPeakScale : PRODUCTION_TUNING.greenClaimBeatPeakScale,
     };
+    return validateTuning(candidate, context).length === 0 ? candidate : null;
   } catch {
     return null;
   }

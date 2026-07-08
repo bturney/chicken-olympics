@@ -1,6 +1,7 @@
 import {
   type PlaytestTuning,
   type TuningDraft,
+  type TuningValidationContext,
   type ValidationError,
   createTuningDraft,
   commitDraft,
@@ -71,6 +72,9 @@ export function parseChanceField(raw: string): { parsed: unknown; error: string 
 export function parseScaleField(raw: string): { parsed: unknown; error: string | null } {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return { parsed: null, error: null };
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    return { parsed: null, error: "Must be a non-negative finite number" };
+  }
   const val = parseFloat(trimmed);
   if (!Number.isFinite(val) || val < 0) return { parsed: null, error: "Must be a non-negative finite number" };
   return { parsed: val, error: null };
@@ -123,6 +127,7 @@ function buildFieldValues(tuning: PlaytestTuning): string[] {
 function applyFieldValues(
   draft: TuningDraft,
   fieldValues: string[],
+  validationContext: TuningValidationContext,
 ): { draft: TuningDraft; errors: ValidationError[] } {
   const newDraft = cloneTuning(draft.draft);
   const fieldErrors: ValidationError[] = [];
@@ -138,7 +143,7 @@ function applyFieldValues(
     }
   }
 
-  const tuningErrors = validateTuning(newDraft);
+  const tuningErrors = validateTuning(newDraft, validationContext);
   const allErrors = [...fieldErrors, ...tuningErrors];
 
   return {
@@ -153,16 +158,20 @@ export interface PlaytestMenuState {
   fieldValues: string[];
   activeFieldIndex: number;
   errors: ValidationError[];
+  validationContext: TuningValidationContext;
 }
 
-export function createPlaytestMenuState(): PlaytestMenuState {
-  const draft = createTuningDraft();
+export function createPlaytestMenuState(
+  validationContext: TuningValidationContext = {},
+): PlaytestMenuState {
+  const draft = createTuningDraft(validationContext);
   return {
     visible: false,
     draft,
     fieldValues: buildFieldValues(draft.draft),
     activeFieldIndex: 0,
     errors: [],
+    validationContext,
   };
 }
 
@@ -171,13 +180,14 @@ export function toggleMenu(state: PlaytestMenuState): PlaytestMenuState {
 }
 
 export function closeMenu(_state: PlaytestMenuState): PlaytestMenuState {
-  const draft = createTuningDraft();
+  const draft = createTuningDraft(_state.validationContext);
   return {
     visible: false,
     draft,
     fieldValues: buildFieldValues(draft.draft),
     activeFieldIndex: 0,
     errors: [],
+    validationContext: _state.validationContext,
   };
 }
 
@@ -195,7 +205,7 @@ export function updateFieldValue(
 ): PlaytestMenuState {
   const newFieldValues = [...state.fieldValues];
   newFieldValues[state.activeFieldIndex] = raw;
-  const { draft, errors } = applyFieldValues(state.draft, newFieldValues);
+  const { draft, errors } = applyFieldValues(state.draft, newFieldValues, state.validationContext);
   return { ...state, draft, fieldValues: newFieldValues, errors };
 }
 
@@ -206,7 +216,7 @@ export function updateFieldValueAt(
 ): PlaytestMenuState {
   const newFieldValues = [...state.fieldValues];
   newFieldValues[index] = raw;
-  const { draft, errors } = applyFieldValues(state.draft, newFieldValues);
+  const { draft, errors } = applyFieldValues(state.draft, newFieldValues, state.validationContext);
   return { ...state, draft, fieldValues: newFieldValues, errors };
 }
 

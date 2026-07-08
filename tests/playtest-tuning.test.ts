@@ -171,6 +171,14 @@ describe("parseDurationMs", () => {
     expect(parseDurationMs("600000")).toBe(600_000);
   });
 
+  it("parses milliseconds with an ms suffix", () => {
+    expect(parseDurationMs("600000ms")).toBe(600_000);
+  });
+
+  it("parses formatted duration output", () => {
+    expect(parseDurationMs(formatDurationMs(90_000))).toBe(90_000);
+  });
+
   it("parses seconds with an s suffix", () => {
     expect(parseDurationMs("600s")).toBe(600_000);
   });
@@ -384,6 +392,33 @@ describe("createTuningDraft", () => {
     const draft = createTuningDraft();
     expect(draft.draft).toEqual(PRODUCTION_TUNING);
   });
+
+  it("falls back to production defaults when saved tuning has an invalid refill range", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(fullTuning({ normalRefillMinMs: 2_000, normalRefillMaxMs: 1_000 })),
+    );
+    const draft = createTuningDraft();
+    expect(draft.draft).toEqual(PRODUCTION_TUNING);
+  });
+
+  it("falls back to production defaults when saved tuning has an invalid green chick schedule range", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(fullTuning({ greenChickScheduleMinMs: 60_000, greenChickScheduleMaxMs: 20_000 })),
+    );
+    const draft = createTuningDraft();
+    expect(draft.draft).toEqual(PRODUCTION_TUNING);
+  });
+
+  it("falls back to production defaults when saved tuning has an invalid bot reaction range", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(fullTuning({ reactionDelayMinMs: 600, reactionDelayMaxMs: 300 })),
+    );
+    const draft = createTuningDraft();
+    expect(draft.draft).toEqual(PRODUCTION_TUNING);
+  });
 });
 
 describe("validateTuning", () => {
@@ -430,6 +465,13 @@ describe("validateTuning", () => {
 
   it("rejects non-integer normalPeekCount", () => {
     const errors = validateTuning(fullTuning({ normalPeekCount: 2.5 }));
+    expect(errors.some((e) => e.field === "normalPeekCount")).toBe(true);
+  });
+
+  it("rejects normalPeekCount above available Hiding Spots when context is provided", () => {
+    const errors = validateTuning(fullTuning({ normalPeekCount: 7 }), {
+      hidingSpotCount: 6,
+    });
     expect(errors.some((e) => e.field === "normalPeekCount")).toBe(true);
   });
 

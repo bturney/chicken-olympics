@@ -30,6 +30,7 @@ import {
   FIELDS,
   SECTIONS,
   createPlaytestMenuState,
+  parseScaleField,
   toggleMenu,
   updateFieldValue,
   activateField,
@@ -176,6 +177,14 @@ describe("createPlaytestMenuState", () => {
     expect(state.errors).toEqual([]);
     expect(state.activeFieldIndex).toBe(0);
   });
+
+  it("uses validation context for Hiding Spot count", () => {
+    const state = createPlaytestMenuState({ hidingSpotCount: 2 });
+    const peekCountIndex = FIELDS.findIndex((f) => f.key === "normalPeekCount");
+    const withActive = activateField(state, peekCountIndex);
+    const updated = updateFieldValue(withActive, "3");
+    expect(updated.errors.some((e) => e.field === "normalPeekCount")).toBe(true);
+  });
 });
 
 describe("toggleMenu", () => {
@@ -262,6 +271,32 @@ describe("updateFieldValue", () => {
     const withActive = activateField(state, speedIndex);
     const updated = updateFieldValue(withActive, "200");
     expect(updated.draft.draft.botSpeed).toBe(200);
+  });
+
+  it("does not make the formatted default match length invalid when editing another field", () => {
+    const state = createPlaytestMenuState();
+    const speedIndex = FIELDS.findIndex((f) => f.key === "playerSpeed");
+    const withActive = activateField(state, speedIndex);
+    const updated = updateFieldValue(withActive, "500");
+    expect(updated.errors).toEqual([]);
+  });
+});
+
+describe("parseScaleField", () => {
+  it("parses a non-negative finite number", () => {
+    expect(parseScaleField("1.5")).toEqual({ parsed: 1.5, error: null });
+  });
+
+  it("rejects trailing text", () => {
+    expect(parseScaleField("1abc").error).not.toBeNull();
+  });
+
+  it("rejects Infinity", () => {
+    expect(parseScaleField("Infinity").error).not.toBeNull();
+  });
+
+  it("rejects negative values", () => {
+    expect(parseScaleField("-1").error).not.toBeNull();
   });
 });
 

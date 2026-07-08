@@ -45,8 +45,6 @@ const PRODUCTION_CONFIG = {
   greenClaimBeatPeakScale: 2.8,
 } as const;
 
-const NORMAL_CHICK_POINTS = 1;
-
 interface ClaimAnimation {
   slotIndex: number;
   spotIndex: number;
@@ -127,7 +125,7 @@ export class MatchPresentationFeedback {
           commands.push({
             type: "claimScoreEcho",
             spotIndex: event.spotIndex,
-            points: NORMAL_CHICK_POINTS,
+            points: event.points,
             cssColor: this.playerCssColors[event.playerIndex],
           });
           commands.push({ type: "sfx", id: "normalClaim" });

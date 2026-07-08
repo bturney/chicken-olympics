@@ -144,7 +144,9 @@ export class MatchScene extends Phaser.Scene {
   create(): void {
     const { width } = this.scale;
 
-    this.menuState = createPlaytestMenuState();
+    this.menuState = createPlaytestMenuState({
+      hidingSpotCount: FARMYARD_LAYOUT.hidingSpots.length,
+    });
     this.menuActive = false;
 
     const applied = this.menuState.draft.applied;
@@ -226,7 +228,9 @@ export class MatchScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     if (this.transitioned) return;
 
-    if (!this.menuActive) {
+    if (this.menuActive) {
+      this.stopPlayerMovement();
+    } else {
       this.handleMovement();
     }
     const events = this.match.advance(delta);
@@ -738,6 +742,7 @@ export class MatchScene extends Phaser.Scene {
           this.menuState = closeMenu(this.menuState);
         } else {
           this.menuState = toggleMenu(this.menuState);
+          this.stopPlayerMovement();
         }
         this.menuActive = this.menuState.visible;
         this.menuContainer.setVisible(this.menuActive);
@@ -938,7 +943,7 @@ export class MatchScene extends Phaser.Scene {
     this.menuContainer.add(this.menuApplyBtn);
 
     this.menuRestartBtn = this.add
-      .text(this.menuApplyBtn.x + this.menuApplyBtn.width + btnGap, btnY, "Restart Match", btnStyle)
+      .text(this.menuApplyBtn.x + this.menuApplyBtn.width + btnGap, btnY, "Restart Match With Tuning", btnStyle)
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", () => this.onRestartMatch());
     this.menuContainer.add(this.menuRestartBtn);
@@ -1068,6 +1073,11 @@ export class MatchScene extends Phaser.Scene {
       indecisionDurationMs: a.indecisionDurationMs,
       farTargetChance: a.farTargetChance,
     };
+  }
+
+  private stopPlayerMovement(): void {
+    this.p1Chicken.setVelocity(0, 0);
+    this.p2Chicken.setVelocity(0, 0);
   }
 
   private handleMovement(): void {
@@ -1249,7 +1259,8 @@ export class MatchScene extends Phaser.Scene {
         Math.sin((view.elapsedMs - anticipation.startedAtMs) / 60) * 2;
       const progress = Math.min(
         1,
-        (view.elapsedMs - anticipation.startedAtMs) / 700,
+        (view.elapsedMs - anticipation.startedAtMs) /
+          this.menuState.draft.applied.peekAnticipationDurationMs,
       );
       const radius = 18 * WORLD_SCALE + progress * 18 * WORLD_SCALE + wobble;
       const alpha = 0.75 * (1 - progress * 0.35);

@@ -68,6 +68,7 @@ export type MatchEvent =
       slotIndex: number;
       spotIndex: number;
       playerIndex: PlayerIndex;
+      points: number;
     }
   | { type: "greenChickAppeared"; spotIndex: number }
   | { type: "greenChickClaimed"; spotIndex: number; playerIndex: PlayerIndex }
@@ -190,7 +191,7 @@ export class Match {
     this.peekState = result.peekState;
 
     if (!result.claimed || slotIndex === -1) return [];
-    return [{ type: "normalChickClaimed", slotIndex, spotIndex, playerIndex }];
+    return [{ type: "normalChickClaimed", slotIndex, spotIndex, playerIndex, points: this.peekPressureConfig.normalChickPoints }];
   }
 
   view(): MatchView {

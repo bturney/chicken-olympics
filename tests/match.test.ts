@@ -146,6 +146,7 @@ describe("Match", () => {
         slotIndex: 0,
         spotIndex: 0,
         playerIndex: 1,
+        points: 1,
       },
     ]);
     expect(match.view().scores).toEqual([0, 1]);
@@ -172,6 +173,7 @@ describe("Match", () => {
         slotIndex: 0,
         spotIndex: 0,
         playerIndex: 3,
+        points: 1,
       },
     ]);
     expect(match.view().scores).toEqual([0, 0, 0, 1]);
@@ -369,6 +371,27 @@ describe("Match", () => {
       const spot = match.view().normalChicks[0]?.spotIndex ?? 0;
       match.claim(spot, 1);
       expect(match.view().scores).toEqual([0, 3]);
+    });
+
+    it("includes tuned normalChickPoints in claim events", () => {
+      const match = new Match({
+        durationMs: 9_000,
+        spotCount: 6,
+        random: constantRandom(0),
+        peekPressureConfig: { normalChickPoints: 3 },
+      });
+      match.advance(0);
+      const spot = match.view().normalChicks[0]?.spotIndex ?? 0;
+      const events = match.claim(spot, 1);
+      expect(events).toEqual([
+        {
+          type: "normalChickClaimed",
+          slotIndex: 0,
+          spotIndex: 0,
+          playerIndex: 1,
+          points: 3,
+        },
+      ]);
     });
   });
 

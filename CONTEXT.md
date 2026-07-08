@@ -137,5 +137,5 @@ A declarative data object the presentation feedback module returns to tell the s
 _Avoid_: Signal, callback, event
 
 **Playtest Tuning Menu**:
-A development-only overlay for adjusting match feel during local playtesting, focused on Peek Pressure, Chicken Cursor Responsiveness, Bot Chicken Indecision, and claim feedback rather than player-facing options.
+A hidden playtesting overlay that may ship but is not player-facing, used for adjusting match feel during local playtesting, focused on Peek Pressure, Chicken Cursor Responsiveness, Bot Chicken Indecision, and claim feedback rather than player-facing options.
 _Avoid_: Debug menu, settings menu, difficulty menu, cheat menu

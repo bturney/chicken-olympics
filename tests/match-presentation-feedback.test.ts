@@ -76,7 +76,7 @@ function findGreenBeat(
 }
 
 const CLAIM_EVENTS: MatchEvent[] = [
-  { type: "normalChickClaimed", slotIndex: 0, spotIndex: 1, playerIndex: 0 },
+  { type: "normalChickClaimed", slotIndex: 0, spotIndex: 1, playerIndex: 0, points: 1 },
 ];
 
 describe("MatchPresentationFeedback", () => {
@@ -132,6 +132,17 @@ describe("MatchPresentationFeedback", () => {
     expect(echo!.spotIndex).toBe(1);
     expect(echo!.points).toBe(1);
     expect(echo!.cssColor).toBe("#4488ff");
+  });
+
+  it("uses normal chick points from the claim event for the score echo", () => {
+    const feedback = createFeedback();
+    const commands = feedback.update(
+      [{ type: "normalChickClaimed", slotIndex: 0, spotIndex: 1, playerIndex: 0, points: 3 }],
+      1000,
+    );
+    const echo = findEcho(commands);
+    expect(echo).toBeDefined();
+    expect(echo!.points).toBe(3);
   });
 
   it("returns an sfx command with normalClaim when a normal chick is claimed", () => {

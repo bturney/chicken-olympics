@@ -28,6 +28,7 @@ beforeEach(() => {
 import { PRODUCTION_TUNING } from "../src/match/playtestTuning";
 import {
   FIELDS,
+  SECTIONS,
   createPlaytestMenuState,
   toggleMenu,
   updateFieldValue,
@@ -61,6 +62,107 @@ describe("FIELDS", () => {
     checkLive("claimPopPeakScale");
     checkLive("greenClaimBeatDurationMs");
     checkLive("greenClaimBeatPeakScale");
+  });
+});
+
+describe("SECTIONS", () => {
+  it("has 6 sections: Match, Chicken Cursor Responsiveness, Peek Pressure, Green Chick, Bot Chicken Indecision, Claim Feedback", () => {
+    expect(SECTIONS).toEqual([
+      "Match",
+      "Chicken Cursor Responsiveness",
+      "Peek Pressure",
+      "Green Chick",
+      "Bot Chicken Indecision",
+      "Claim Feedback",
+    ]);
+  });
+
+  it("every field belongs to a recognized section", () => {
+    for (const field of FIELDS) {
+      expect(SECTIONS).toContain(field.section);
+    }
+  });
+});
+
+describe("fields per section", () => {
+  it("Match section has matchDurationMs (restartRequired)", () => {
+    const matchFields = FIELDS.filter((f) => f.section === "Match");
+    expect(matchFields).toHaveLength(1);
+    expect(matchFields[0]!.key).toBe("matchDurationMs");
+    expect(matchFields[0]!.restartRequired).toBe(true);
+  });
+
+  it("Chicken Cursor Responsiveness section has playerSpeed and botSpeed (live)", () => {
+    const fields = FIELDS.filter((f) => f.section === "Chicken Cursor Responsiveness");
+    expect(fields).toHaveLength(2);
+    const keys = fields.map((f) => f.key).sort();
+    expect(keys).toEqual(["botSpeed", "playerSpeed"]);
+    for (const f of fields) {
+      expect(f.restartRequired).toBe(false);
+    }
+  });
+
+  it("Peek Pressure section has 6 peek-related fields (all restartRequired)", () => {
+    const fields = FIELDS.filter((f) => f.section === "Peek Pressure");
+    expect(fields).toHaveLength(6);
+    const keys = fields.map((f) => f.key).sort();
+    expect(keys).toEqual([
+      "normalChickPoints",
+      "normalPeekCount",
+      "normalPeekDurationMs",
+      "normalRefillMaxMs",
+      "normalRefillMinMs",
+      "peekAnticipationDurationMs",
+    ]);
+    for (const f of fields) {
+      expect(f.restartRequired).toBe(true);
+    }
+  });
+
+  it("Green Chick section has 4 green-chick fields (all restartRequired)", () => {
+    const fields = FIELDS.filter((f) => f.section === "Green Chick");
+    expect(fields).toHaveLength(4);
+    const keys = fields.map((f) => f.key).sort();
+    expect(keys).toEqual([
+      "greenChickEnabled",
+      "greenChickPoints",
+      "greenChickScheduleMaxMs",
+      "greenChickScheduleMinMs",
+    ]);
+    for (const f of fields) {
+      expect(f.restartRequired).toBe(true);
+    }
+  });
+
+  it("Bot Chicken Indecision section has 5 bot fields (all live)", () => {
+    const fields = FIELDS.filter((f) => f.section === "Bot Chicken Indecision");
+    expect(fields).toHaveLength(5);
+    const keys = fields.map((f) => f.key).sort();
+    expect(keys).toEqual([
+      "farTargetChance",
+      "indecisionChance",
+      "indecisionDurationMs",
+      "reactionDelayMaxMs",
+      "reactionDelayMinMs",
+    ]);
+    for (const f of fields) {
+      expect(f.restartRequired).toBe(false);
+    }
+  });
+
+  it("Claim Feedback section has 4 claim-feedback fields (all live)", () => {
+    const fields = FIELDS.filter((f) => f.section === "Claim Feedback");
+    expect(fields).toHaveLength(4);
+    const keys = fields.map((f) => f.key).sort();
+    expect(keys).toEqual([
+      "claimFeedbackDurationMs",
+      "claimPopPeakScale",
+      "greenClaimBeatDurationMs",
+      "greenClaimBeatPeakScale",
+    ]);
+    for (const f of fields) {
+      expect(f.restartRequired).toBe(false);
+    }
   });
 });
 

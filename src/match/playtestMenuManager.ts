@@ -24,7 +24,17 @@ export interface FieldDef {
   unitHint: string;
   restartRequired: boolean;
   parser: FieldParser;
+  section: string;
 }
+
+export const SECTIONS: string[] = [
+  "Match",
+  "Chicken Cursor Responsiveness",
+  "Peek Pressure",
+  "Green Chick",
+  "Bot Chicken Indecision",
+  "Claim Feedback",
+];
 
 export function parseDurationField(raw: string): { parsed: unknown; error: string | null } {
   const val = parseDurationMs(raw);
@@ -77,28 +87,33 @@ export function formatFieldValue(key: string, tuning: PlaytestTuning): string {
 }
 
 export const FIELDS: FieldDef[] = [
-  { key: "matchDurationMs", label: "Match Length", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
-  { key: "normalPeekCount", label: "Normal Peek count", unitHint: "(whole number)", restartRequired: true, parser: parseCountField },
-  { key: "normalPeekDurationMs", label: "Peek duration", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
-  { key: "normalRefillMinMs", label: "Refill min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
-  { key: "normalRefillMaxMs", label: "Refill max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
-  { key: "peekAnticipationDurationMs", label: "Peek Anticipation", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
-  { key: "normalChickPoints", label: "Normal chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField },
-  { key: "greenChickEnabled", label: "Green Chick enabled", unitHint: "(true/false)", restartRequired: true, parser: parseBooleanField },
-  { key: "greenChickPoints", label: "Green Chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField },
-  { key: "greenChickScheduleMinMs", label: "Green Chick schedule min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
-  { key: "greenChickScheduleMaxMs", label: "Green Chick schedule max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
-  { key: "playerSpeed", label: "Player Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.playerSpeed) },
-  { key: "botSpeed", label: "Bot Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.botSpeed) },
-  { key: "reactionDelayMinMs", label: "Bot Reaction Delay min", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
-  { key: "reactionDelayMaxMs", label: "Bot Reaction Delay max", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
-  { key: "indecisionChance", label: "Bot Indecision chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField },
-  { key: "indecisionDurationMs", label: "Bot Indecision duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
-  { key: "farTargetChance", label: "Bot Far Target chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField },
-  { key: "claimFeedbackDurationMs", label: "Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
-  { key: "claimPopPeakScale", label: "Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField },
-  { key: "greenClaimBeatDurationMs", label: "Green Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
-  { key: "greenClaimBeatPeakScale", label: "Green Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField },
+  { key: "matchDurationMs", label: "Match Length", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Match" },
+
+  { key: "playerSpeed", label: "Player Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.playerSpeed), section: "Chicken Cursor Responsiveness" },
+  { key: "botSpeed", label: "Bot Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.botSpeed), section: "Chicken Cursor Responsiveness" },
+
+  { key: "normalPeekCount", label: "Normal Peek count", unitHint: "(whole number)", restartRequired: true, parser: parseCountField, section: "Peek Pressure" },
+  { key: "normalPeekDurationMs", label: "Peek duration", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
+  { key: "normalRefillMinMs", label: "Refill min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
+  { key: "normalRefillMaxMs", label: "Refill max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
+  { key: "peekAnticipationDurationMs", label: "Peek Anticipation", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
+  { key: "normalChickPoints", label: "Normal chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField, section: "Peek Pressure" },
+
+  { key: "greenChickEnabled", label: "Green Chick enabled", unitHint: "(true/false)", restartRequired: true, parser: parseBooleanField, section: "Green Chick" },
+  { key: "greenChickPoints", label: "Green Chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField, section: "Green Chick" },
+  { key: "greenChickScheduleMinMs", label: "Green Chick schedule min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Green Chick" },
+  { key: "greenChickScheduleMaxMs", label: "Green Chick schedule max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Green Chick" },
+
+  { key: "reactionDelayMinMs", label: "Bot Reaction Delay min", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Bot Chicken Indecision" },
+  { key: "reactionDelayMaxMs", label: "Bot Reaction Delay max", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Bot Chicken Indecision" },
+  { key: "indecisionChance", label: "Bot Indecision chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField, section: "Bot Chicken Indecision" },
+  { key: "indecisionDurationMs", label: "Bot Indecision duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Bot Chicken Indecision" },
+  { key: "farTargetChance", label: "Bot Far Target chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField, section: "Bot Chicken Indecision" },
+
+  { key: "claimFeedbackDurationMs", label: "Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Claim Feedback" },
+  { key: "claimPopPeakScale", label: "Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField, section: "Claim Feedback" },
+  { key: "greenClaimBeatDurationMs", label: "Green Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Claim Feedback" },
+  { key: "greenClaimBeatPeakScale", label: "Green Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField, section: "Claim Feedback" },
 ];
 
 function buildFieldValues(tuning: PlaytestTuning): string[] {

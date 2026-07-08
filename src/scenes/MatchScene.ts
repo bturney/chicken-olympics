@@ -6,6 +6,17 @@ import {
 import { Match } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
 import {
+  type PlaytestMenuState,
+  createPlaytestMenuState,
+  toggleMenu,
+  updateFieldValue,
+  applyTuning,
+  resetDraftAction,
+  stageDefaultsAction,
+  closeMenu,
+} from "../match/playtestMenuManager";
+
+import {
   createBotChickenController,
   tickBotChickenController,
   type BotChickenController,
@@ -77,6 +88,13 @@ export class MatchScene extends Phaser.Scene {
   private botSlots: number[] = [];
   private botControllers = new Map<number, BotChickenController>();
 
+  private menuState!: PlaytestMenuState;
+  private menuContainer!: Phaser.GameObjects.Container;
+  private menuActive = false;
+  private sceneData!: MatchSceneData;
+  private menuFieldText!: Phaser.GameObjects.Text;
+  private menuErrorText!: Phaser.GameObjects.Text;
+
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
   private p1Shadow!: Phaser.GameObjects.Ellipse;
@@ -104,6 +122,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   init(data: MatchSceneData): void {
+    this.sceneData = data;
     if (data.p1Color) this.p1Color = data.p1Color;
     if (data.p2Color) this.p2Color = data.p2Color;
     if (data.playerSlotCount) this.playerSlotCount = data.playerSlotCount;
@@ -117,7 +136,11 @@ export class MatchScene extends Phaser.Scene {
   create(): void {
     const { width } = this.scale;
 
+    this.menuState = createPlaytestMenuState();
+    this.menuActive = false;
+
     this.match = new Match({
+      durationMs: this.menuState.draft.applied.matchDurationMs,
       spotCount: FARMYARD_LAYOUT.hidingSpots.length,
       spotPositions: FARMYARD_LAYOUT.hidingSpots,
       playerSlotCount: this.playerSlotCount,
@@ -158,6 +181,9 @@ export class MatchScene extends Phaser.Scene {
     this.createOverlaps();
     this.drawBounds();
 
+    this.createPlaytestMenu();
+    this.createPlaytestKeybind();
+
     this.match.advance(0);
     this.feedbackCommands = this.presentationFeedback.update(
       [],
@@ -171,7 +197,9 @@ export class MatchScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     if (this.transitioned) return;
 
-    this.handleMovement();
+    if (!this.menuActive) {
+      this.handleMovement();
+    }
     const events = this.match.advance(delta);
     this.feedbackCommands = this.presentationFeedback.update(
       events,
@@ -672,6 +700,201 @@ export class MatchScene extends Phaser.Scene {
       D: Phaser.Input.Keyboard.Key;
     };
     this.arrows = this.input.keyboard!.createCursorKeys();
+  }
+
+  private createPlaytestKeybind(): void {
+    this.input.keyboard!.on("keydown", (event: KeyboardEvent) => {
+      if (event.key === "`" || event.key === "~") {
+        if (this.menuActive) {
+          this.menuState = closeMenu(this.menuState);
+        } else {
+          this.menuState = toggleMenu(this.menuState);
+        }
+        this.menuActive = this.menuState.visible;
+        this.menuContainer.setVisible(this.menuActive);
+        this.renderPlaytestMenu();
+        return;
+      }
+      if (!this.menuActive) return;
+
+      if (event.key === "Escape") {
+        this.menuState = closeMenu(this.menuState);
+        this.menuActive = false;
+        this.menuContainer.setVisible(false);
+        return;
+      }
+
+      const current = this.menuState.fieldValue;
+      let next: string | null = null;
+      if (event.key === "Backspace") {
+        next = current.slice(0, -1);
+      } else if (
+        event.key.length === 1 &&
+        /[\d.sm]/.test(event.key)
+      ) {
+        next = current + event.key;
+      }
+      if (next !== null) {
+        this.menuState = updateFieldValue(this.menuState, next);
+        this.renderPlaytestMenu();
+      }
+    });
+  }
+
+  private createPlaytestMenu(): void {
+    const { width, height } = this.scale;
+    const panelW = 480;
+    const panelH = 360;
+    const px = (width - panelW) / 2;
+    const py = (height - panelH) / 2;
+
+    this.menuContainer = this.add.container(0, 0);
+    this.menuContainer.setDepth(100);
+    this.menuContainer.setVisible(false);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x111122, 0.92);
+    bg.fillRoundedRect(px, py, panelW, panelH, 12);
+    bg.lineStyle(2, 0x4488ff, 0.8);
+    bg.strokeRoundedRect(px, py, panelW, panelH, 12);
+    this.menuContainer.add(bg);
+
+    const title = this.add
+      .text(width / 2, py + 24, "Playtest Tuning", {
+        fontSize: "22px",
+        color: "#ffdd44",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+    this.menuContainer.add(title);
+
+    const fieldLabel = this.add
+      .text(px + 24, py + 60, "Match Length", {
+        fontSize: "16px",
+        color: "#ffffff",
+      });
+    this.menuContainer.add(fieldLabel);
+
+    const unitHint = this.add
+      .text(px + panelW - 24, py + 60, "(ms, s, m)", {
+        fontSize: "14px",
+        color: "#888899",
+      })
+      .setOrigin(1, 0);
+    this.menuContainer.add(unitHint);
+
+    const fieldBg = this.add.graphics();
+    fieldBg.fillStyle(0x222244, 1);
+    fieldBg.fillRoundedRect(px + 24, py + 84, panelW - 48, 34, 4);
+    fieldBg.lineStyle(1, 0x4488ff, 0.6);
+    fieldBg.strokeRoundedRect(px + 24, py + 84, panelW - 48, 34, 4);
+    this.menuContainer.add(fieldBg);
+
+    const restartLabel = this.add
+      .text(px + panelW - 24, py + 122, "* Restart required", {
+        fontSize: "12px",
+        color: "#ff8844",
+      })
+      .setOrigin(1, 0);
+    this.menuContainer.add(restartLabel);
+
+    this.menuErrorText = this.add
+      .text(px + 24, py + 142, "", {
+        fontSize: "13px",
+        color: "#ff4444",
+      });
+    this.menuContainer.add(this.menuErrorText);
+
+    const fieldValueBg = this.add.graphics();
+    this.menuContainer.add(fieldValueBg);
+
+    this.menuFieldText = this.add
+      .text(px + 32, py + 93, "", {
+        fontSize: "17px",
+        color: "#ffffff",
+      });
+    this.menuContainer.add(this.menuFieldText);
+
+    const btnStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontSize: "15px",
+      color: "#ffffff",
+      backgroundColor: "#334488",
+      padding: { x: 10, y: 6 },
+    };
+    const btnY = py + panelH - 72;
+    const btnGap = 8;
+
+    const applyBtn = this.add
+      .text(px + 24, btnY, "Apply", btnStyle)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onApply());
+    this.menuContainer.add(applyBtn);
+
+    const restartBtn = this.add
+      .text(applyBtn.x + applyBtn.width + btnGap, btnY, "Restart Match", btnStyle)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onRestartMatch());
+    this.menuContainer.add(restartBtn);
+
+    const resetBtn = this.add
+      .text(px + 24, btnY + 36, "Reset Draft", btnStyle)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onResetDraft());
+    this.menuContainer.add(resetBtn);
+
+    const defaultsBtn = this.add
+      .text(resetBtn.x + resetBtn.width + btnGap, btnY + 36, "Defaults / Clear Saved", btnStyle)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onStageDefaults());
+    this.menuContainer.add(defaultsBtn);
+
+    const closeBtn = this.add
+      .text(px + panelW - 24, py + 12, "✕", {
+        fontSize: "18px",
+        color: "#888899",
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onCloseMenu());
+    this.menuContainer.add(closeBtn);
+  }
+
+  private renderPlaytestMenu(): void {
+    this.menuFieldText.setText(this.menuState.fieldValue + "█");
+
+    const errMsg =
+      this.menuState.errors.length > 0
+        ? this.menuState.errors.map((e) => e.message).join("; ")
+        : "";
+    this.menuErrorText.setText(errMsg);
+  }
+
+  private onApply(): void {
+    if (this.menuState.errors.length > 0) return;
+    this.menuState = applyTuning(this.menuState);
+    this.renderPlaytestMenu();
+  }
+
+  private onRestartMatch(): void {
+    if (this.menuState.errors.length > 0) return;
+    this.menuState = applyTuning(this.menuState);
+    this.scene.restart(this.sceneData);
+  }
+
+  private onResetDraft(): void {
+    this.menuState = resetDraftAction(this.menuState);
+    this.renderPlaytestMenu();
+  }
+
+  private onStageDefaults(): void {
+    this.menuState = stageDefaultsAction(this.menuState);
+    this.renderPlaytestMenu();
+  }
+
+  private onCloseMenu(): void {
+    this.menuState = closeMenu(this.menuState);
+    this.menuActive = false;
+    this.menuContainer.setVisible(false);
   }
 
   private handleMovement(): void {

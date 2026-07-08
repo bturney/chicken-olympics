@@ -134,7 +134,10 @@ function chooseTarget(
       distanceSquared(input.botPosition, a) -
       distanceSquared(input.botPosition, b),
   );
-  if (distanceRanked.length > 1 && controller.random() > 1 - config.farTargetChance) {
+  if (
+    distanceRanked.length > 1 &&
+    controller.random() > 1 - config.farTargetChance
+  ) {
     return distanceRanked[distanceRanked.length - 1] ?? null;
   }
   return distanceRanked[0] ?? null;

@@ -140,8 +140,7 @@ export function createGreenChickState(
   );
   const scheduledAtMs =
     Math.floor(
-      (config.scheduleMinMs * matchDurationMs) /
-        PRODUCTION_MATCH_DURATION_MS,
+      (config.scheduleMinMs * matchDurationMs) / PRODUCTION_MATCH_DURATION_MS,
     ) + Math.floor(random() * scaledRange);
   return {
     status: config.enabled ? "pending" : "missed",
@@ -188,7 +187,8 @@ export function isGreenChickPeekActive(
     return false;
   }
   return (
-    currentTimeMs - greenChickState.peekStartedAtMs < config.normalPeekDurationMs
+    currentTimeMs - greenChickState.peekStartedAtMs <
+    config.normalPeekDurationMs
   );
 }
 
@@ -223,7 +223,8 @@ export function tickGreenChickState(
   if (
     greenChickState.status === "active" &&
     greenChickState.peekStartedAtMs !== null &&
-    currentTimeMs - greenChickState.peekStartedAtMs >= config.normalPeekDurationMs
+    currentTimeMs - greenChickState.peekStartedAtMs >=
+      config.normalPeekDurationMs
   ) {
     return {
       ...greenChickState,
@@ -378,7 +379,10 @@ function getOccupiedNormalSpotIndices(
 ): readonly number[] {
   const out: number[] = [];
   for (const peek of peekState.peeks) {
-    if (isPeekActive(peek, currentTimeMs, config) && peek.activeSpotIndex !== null) {
+    if (
+      isPeekActive(peek, currentTimeMs, config) &&
+      peek.activeSpotIndex !== null
+    ) {
       out.push(peek.activeSpotIndex);
     }
   }
@@ -423,7 +427,11 @@ export function selectFreeSpotIndex(
   return createArena({
     spotCount,
     spotPositions,
-    occupiedSpotIndices: getOccupiedNormalSpotIndices(peekState, currentTimeMs, config),
+    occupiedSpotIndices: getOccupiedNormalSpotIndices(
+      peekState,
+      currentTimeMs,
+      config,
+    ),
     reservedSpotIndices: getReservedNormalSpotIndices(peekState, currentTimeMs),
     recentSpotIndices: peekState.recentSpotIndices,
   }).allocateSpot(randomValue);
@@ -619,7 +627,8 @@ export function attemptClaim(
   config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): ClaimResult {
   const slotIndex = peekState.peeks.findIndex(
-    (p) => p.activeSpotIndex === spotIndex && isPeekActive(p, currentTimeMs, config),
+    (p) =>
+      p.activeSpotIndex === spotIndex && isPeekActive(p, currentTimeMs, config),
   );
   if (slotIndex === -1) {
     return { matchState, peekState, claimed: false };

@@ -119,14 +119,12 @@ describe("FarmyardLayout", () => {
 
 describe("Setup scene layout", () => {
   it("keeps Player 2 label and the human/bot toggle sufficiently separated vertically", () => {
-    const gap =
-      SETUP_SCENE_LAYOUT.P2_TOGGLE_Y - SETUP_SCENE_LAYOUT.P2_LABEL_Y;
+    const gap = SETUP_SCENE_LAYOUT.P2_TOGGLE_Y - SETUP_SCENE_LAYOUT.P2_LABEL_Y;
     expect(gap).toBeGreaterThanOrEqual(40);
   });
 
   it("keeps the Player 2 toggle above the Player 2 swatches with enough room", () => {
-    const gap =
-      SETUP_SCENE_LAYOUT.P2_SWATCH_Y - SETUP_SCENE_LAYOUT.P2_TOGGLE_Y;
+    const gap = SETUP_SCENE_LAYOUT.P2_SWATCH_Y - SETUP_SCENE_LAYOUT.P2_TOGGLE_Y;
     expect(gap).toBeGreaterThanOrEqual(30);
   });
 

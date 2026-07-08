@@ -396,7 +396,9 @@ describe("createTuningDraft", () => {
   it("falls back to production defaults when saved tuning has an invalid refill range", () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(fullTuning({ normalRefillMinMs: 2_000, normalRefillMaxMs: 1_000 })),
+      JSON.stringify(
+        fullTuning({ normalRefillMinMs: 2_000, normalRefillMaxMs: 1_000 }),
+      ),
     );
     const draft = createTuningDraft();
     expect(draft.draft).toEqual(PRODUCTION_TUNING);
@@ -405,7 +407,12 @@ describe("createTuningDraft", () => {
   it("falls back to production defaults when saved tuning has an invalid green chick schedule range", () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(fullTuning({ greenChickScheduleMinMs: 60_000, greenChickScheduleMaxMs: 20_000 })),
+      JSON.stringify(
+        fullTuning({
+          greenChickScheduleMinMs: 60_000,
+          greenChickScheduleMaxMs: 20_000,
+        }),
+      ),
     );
     const draft = createTuningDraft();
     expect(draft.draft).toEqual(PRODUCTION_TUNING);
@@ -414,7 +421,9 @@ describe("createTuningDraft", () => {
   it("falls back to production defaults when saved tuning has an invalid bot reaction range", () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(fullTuning({ reactionDelayMinMs: 600, reactionDelayMaxMs: 300 })),
+      JSON.stringify(
+        fullTuning({ reactionDelayMinMs: 600, reactionDelayMaxMs: 300 }),
+      ),
     );
     const draft = createTuningDraft();
     expect(draft.draft).toEqual(PRODUCTION_TUNING);
@@ -427,9 +436,9 @@ describe("validateTuning", () => {
   });
 
   it("passes for a valid tuned value", () => {
-    expect(
-      validateTuning(fullTuning({ matchDurationMs: 180_000 })),
-    ).toEqual([]);
+    expect(validateTuning(fullTuning({ matchDurationMs: 180_000 }))).toEqual(
+      [],
+    );
   });
 
   it("rejects negative match duration", () => {
@@ -449,18 +458,29 @@ describe("validateTuning", () => {
   });
 
   it("rejects Infinity match duration", () => {
-    const errors = validateTuning(fullTuning({ matchDurationMs: Number.POSITIVE_INFINITY }));
+    const errors = validateTuning(
+      fullTuning({ matchDurationMs: Number.POSITIVE_INFINITY }),
+    );
     expect(errors.length).toBeGreaterThan(0);
   });
 
   it("rejects refill min >= refill max", () => {
-    const errors = validateTuning(fullTuning({ normalRefillMinMs: 2000, normalRefillMaxMs: 1000 }));
+    const errors = validateTuning(
+      fullTuning({ normalRefillMinMs: 2000, normalRefillMaxMs: 1000 }),
+    );
     expect(errors.some((e) => e.field === "normalRefillMaxMs")).toBe(true);
   });
 
   it("rejects green chick schedule min >= max", () => {
-    const errors = validateTuning(fullTuning({ greenChickScheduleMinMs: 50000, greenChickScheduleMaxMs: 30000 }));
-    expect(errors.some((e) => e.field === "greenChickScheduleMaxMs")).toBe(true);
+    const errors = validateTuning(
+      fullTuning({
+        greenChickScheduleMinMs: 50000,
+        greenChickScheduleMaxMs: 30000,
+      }),
+    );
+    expect(errors.some((e) => e.field === "greenChickScheduleMaxMs")).toBe(
+      true,
+    );
   });
 
   it("rejects non-integer normalPeekCount", () => {
@@ -481,7 +501,9 @@ describe("validateTuning", () => {
   });
 
   it("rejects non-boolean greenChickEnabled", () => {
-    const errors = validateTuning(fullTuning({ greenChickEnabled: "yes" as unknown as boolean }));
+    const errors = validateTuning(
+      fullTuning({ greenChickEnabled: "yes" as unknown as boolean }),
+    );
     expect(errors.some((e) => e.field === "greenChickEnabled")).toBe(true);
   });
 
@@ -501,7 +523,9 @@ describe("validateTuning", () => {
   });
 
   it("rejects Infinity playerSpeed", () => {
-    const errors = validateTuning(fullTuning({ playerSpeed: Number.POSITIVE_INFINITY }));
+    const errors = validateTuning(
+      fullTuning({ playerSpeed: Number.POSITIVE_INFINITY }),
+    );
     expect(errors.some((e) => e.field === "playerSpeed")).toBe(true);
   });
 
@@ -526,7 +550,9 @@ describe("validateTuning", () => {
   });
 
   it("rejects reaction delay min >= max", () => {
-    const errors = validateTuning(fullTuning({ reactionDelayMinMs: 500, reactionDelayMaxMs: 500 }));
+    const errors = validateTuning(
+      fullTuning({ reactionDelayMinMs: 500, reactionDelayMaxMs: 500 }),
+    );
     expect(errors.some((e) => e.field === "reactionDelayMaxMs")).toBe(true);
   });
 
@@ -566,29 +592,39 @@ describe("validateTuning", () => {
   });
 
   it("accepts zero chance values", () => {
-    const errors = validateTuning(fullTuning({ indecisionChance: 0, farTargetChance: 0 }));
+    const errors = validateTuning(
+      fullTuning({ indecisionChance: 0, farTargetChance: 0 }),
+    );
     expect(errors.some((e) => e.field === "indecisionChance")).toBe(false);
     expect(errors.some((e) => e.field === "farTargetChance")).toBe(false);
   });
 
   it("accepts one chance values", () => {
-    const errors = validateTuning(fullTuning({ indecisionChance: 1, farTargetChance: 1 }));
+    const errors = validateTuning(
+      fullTuning({ indecisionChance: 1, farTargetChance: 1 }),
+    );
     expect(errors.some((e) => e.field === "indecisionChance")).toBe(false);
     expect(errors.some((e) => e.field === "farTargetChance")).toBe(false);
   });
 
   it("rejects negative claimFeedbackDurationMs", () => {
     const errors = validateTuning(fullTuning({ claimFeedbackDurationMs: -50 }));
-    expect(errors.some((e) => e.field === "claimFeedbackDurationMs")).toBe(true);
+    expect(errors.some((e) => e.field === "claimFeedbackDurationMs")).toBe(
+      true,
+    );
   });
 
   it("accepts non-default claimFeedbackDurationMs", () => {
     const errors = validateTuning(fullTuning({ claimFeedbackDurationMs: 500 }));
-    expect(errors.some((e) => e.field === "claimFeedbackDurationMs")).toBe(false);
+    expect(errors.some((e) => e.field === "claimFeedbackDurationMs")).toBe(
+      false,
+    );
   });
 
   it("rejects NaN claimPopPeakScale", () => {
-    const errors = validateTuning(fullTuning({ claimPopPeakScale: Number.NaN }));
+    const errors = validateTuning(
+      fullTuning({ claimPopPeakScale: Number.NaN }),
+    );
     expect(errors.some((e) => e.field === "claimPopPeakScale")).toBe(true);
   });
 
@@ -598,23 +634,37 @@ describe("validateTuning", () => {
   });
 
   it("rejects negative greenClaimBeatDurationMs", () => {
-    const errors = validateTuning(fullTuning({ greenClaimBeatDurationMs: -100 }));
-    expect(errors.some((e) => e.field === "greenClaimBeatDurationMs")).toBe(true);
+    const errors = validateTuning(
+      fullTuning({ greenClaimBeatDurationMs: -100 }),
+    );
+    expect(errors.some((e) => e.field === "greenClaimBeatDurationMs")).toBe(
+      true,
+    );
   });
 
   it("accepts non-default greenClaimBeatDurationMs", () => {
-    const errors = validateTuning(fullTuning({ greenClaimBeatDurationMs: 1000 }));
-    expect(errors.some((e) => e.field === "greenClaimBeatDurationMs")).toBe(false);
+    const errors = validateTuning(
+      fullTuning({ greenClaimBeatDurationMs: 1000 }),
+    );
+    expect(errors.some((e) => e.field === "greenClaimBeatDurationMs")).toBe(
+      false,
+    );
   });
 
   it("rejects Infinity greenClaimBeatPeakScale", () => {
-    const errors = validateTuning(fullTuning({ greenClaimBeatPeakScale: Number.POSITIVE_INFINITY }));
-    expect(errors.some((e) => e.field === "greenClaimBeatPeakScale")).toBe(true);
+    const errors = validateTuning(
+      fullTuning({ greenClaimBeatPeakScale: Number.POSITIVE_INFINITY }),
+    );
+    expect(errors.some((e) => e.field === "greenClaimBeatPeakScale")).toBe(
+      true,
+    );
   });
 
   it("accepts non-default greenClaimBeatPeakScale", () => {
     const errors = validateTuning(fullTuning({ greenClaimBeatPeakScale: 3.0 }));
-    expect(errors.some((e) => e.field === "greenClaimBeatPeakScale")).toBe(false);
+    expect(errors.some((e) => e.field === "greenClaimBeatPeakScale")).toBe(
+      false,
+    );
   });
 });
 
@@ -649,7 +699,10 @@ describe("commitDraft", () => {
   });
 
   it("clears localStorage when committed tuning equals production defaults", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(fullTuning({ matchDurationMs: 300_000 })));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(fullTuning({ matchDurationMs: 300_000 })),
+    );
     const draft = createTuningDraft();
     draft.draft.matchDurationMs = PRODUCTION_TUNING.matchDurationMs;
     draft.draft.normalPeekCount = PRODUCTION_TUNING.normalPeekCount;
@@ -696,7 +749,10 @@ describe("loadTuning / clearTuning", () => {
   });
 
   it("clears saved tuning", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(fullTuning({ matchDurationMs: 120_000 })));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(fullTuning({ matchDurationMs: 120_000 })),
+    );
     clearTuning();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
@@ -726,7 +782,11 @@ describe("loadTuning / clearTuning", () => {
   it("loads saved data with playerSpeed and botSpeed", () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ matchDurationMs: 120_000, playerSpeed: 600, botSpeed: 200 }),
+      JSON.stringify({
+        matchDurationMs: 120_000,
+        playerSpeed: 600,
+        botSpeed: 200,
+      }),
     );
     const loaded = loadTuning();
     expect(loaded!.playerSpeed).toBe(600);
@@ -783,7 +843,9 @@ describe("isDefaultTuning", () => {
   });
 
   it("returns false for a non-default match duration", () => {
-    expect(isDefaultTuning(fullTuning({ matchDurationMs: 180_000 }))).toBe(false);
+    expect(isDefaultTuning(fullTuning({ matchDurationMs: 180_000 }))).toBe(
+      false,
+    );
   });
 
   it("returns false for a non-default peek count", () => {
@@ -791,7 +853,9 @@ describe("isDefaultTuning", () => {
   });
 
   it("returns false for a non-default green chick state", () => {
-    expect(isDefaultTuning(fullTuning({ greenChickEnabled: false }))).toBe(false);
+    expect(isDefaultTuning(fullTuning({ greenChickEnabled: false }))).toBe(
+      false,
+    );
   });
 
   it("returns false for a non-default player speed", () => {
@@ -803,11 +867,15 @@ describe("isDefaultTuning", () => {
   });
 
   it("returns false for a non-default reaction delay min", () => {
-    expect(isDefaultTuning(fullTuning({ reactionDelayMinMs: 500 }))).toBe(false);
+    expect(isDefaultTuning(fullTuning({ reactionDelayMinMs: 500 }))).toBe(
+      false,
+    );
   });
 
   it("returns false for a non-default reaction delay max", () => {
-    expect(isDefaultTuning(fullTuning({ reactionDelayMaxMs: 1000 }))).toBe(false);
+    expect(isDefaultTuning(fullTuning({ reactionDelayMaxMs: 1000 }))).toBe(
+      false,
+    );
   });
 
   it("returns false for a non-default indecision chance", () => {
@@ -815,7 +883,9 @@ describe("isDefaultTuning", () => {
   });
 
   it("returns false for a non-default indecision duration", () => {
-    expect(isDefaultTuning(fullTuning({ indecisionDurationMs: 300 }))).toBe(false);
+    expect(isDefaultTuning(fullTuning({ indecisionDurationMs: 300 }))).toBe(
+      false,
+    );
   });
 
   it("returns false for a non-default far target chance", () => {
@@ -823,7 +893,9 @@ describe("isDefaultTuning", () => {
   });
 
   it("returns false for a non-default claim feedback duration", () => {
-    expect(isDefaultTuning(fullTuning({ claimFeedbackDurationMs: 500 }))).toBe(false);
+    expect(isDefaultTuning(fullTuning({ claimFeedbackDurationMs: 500 }))).toBe(
+      false,
+    );
   });
 
   it("returns false for a non-default claim pop peak scale", () => {
@@ -831,11 +903,15 @@ describe("isDefaultTuning", () => {
   });
 
   it("returns false for a non-default green claim beat duration", () => {
-    expect(isDefaultTuning(fullTuning({ greenClaimBeatDurationMs: 1000 }))).toBe(false);
+    expect(
+      isDefaultTuning(fullTuning({ greenClaimBeatDurationMs: 1000 })),
+    ).toBe(false);
   });
 
   it("returns false for a non-default green claim beat peak scale", () => {
-    expect(isDefaultTuning(fullTuning({ greenClaimBeatPeakScale: 3.0 }))).toBe(false);
+    expect(isDefaultTuning(fullTuning({ greenClaimBeatPeakScale: 3.0 }))).toBe(
+      false,
+    );
   });
 });
 

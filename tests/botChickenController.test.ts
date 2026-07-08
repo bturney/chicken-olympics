@@ -150,7 +150,9 @@ describe("Bot Chicken controller", () => {
 });
 
 describe("Bot Chicken controller with tuned indecision config", () => {
-  function defaultConfig(overrides?: Partial<BotChickenConfig>): BotChickenConfig {
+  function defaultConfig(
+    overrides?: Partial<BotChickenConfig>,
+  ): BotChickenConfig {
     return {
       reactionDelayMinMs: 300,
       reactionDelayMaxMs: 550,
@@ -180,7 +182,10 @@ describe("Bot Chicken controller with tuned indecision config", () => {
       elapsedMs: 50,
       speed: 200,
       visibleTargets: [{ spotIndex: 1, x: 100, y: 0 }],
-      config: defaultConfig({ reactionDelayMinMs: 200, reactionDelayMaxMs: 200 }),
+      config: defaultConfig({
+        reactionDelayMinMs: 200,
+        reactionDelayMaxMs: 200,
+      }),
     });
     expect(result.velocity).toEqual({ vx: 0, vy: 0 });
   });

@@ -94,7 +94,9 @@ describe("fields per section", () => {
   });
 
   it("Chicken Cursor Responsiveness section has playerSpeed and botSpeed (live)", () => {
-    const fields = FIELDS.filter((f) => f.section === "Chicken Cursor Responsiveness");
+    const fields = FIELDS.filter(
+      (f) => f.section === "Chicken Cursor Responsiveness",
+    );
     expect(fields).toHaveLength(2);
     const keys = fields.map((f) => f.key).sort();
     expect(keys).toEqual(["botSpeed", "playerSpeed"]);
@@ -183,7 +185,9 @@ describe("createPlaytestMenuState", () => {
     const peekCountIndex = FIELDS.findIndex((f) => f.key === "normalPeekCount");
     const withActive = activateField(state, peekCountIndex);
     const updated = updateFieldValue(withActive, "3");
-    expect(updated.errors.some((e) => e.field === "normalPeekCount")).toBe(true);
+    expect(updated.errors.some((e) => e.field === "normalPeekCount")).toBe(
+      true,
+    );
   });
 });
 

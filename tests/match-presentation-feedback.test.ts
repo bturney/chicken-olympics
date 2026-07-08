@@ -76,7 +76,13 @@ function findGreenBeat(
 }
 
 const CLAIM_EVENTS: MatchEvent[] = [
-  { type: "normalChickClaimed", slotIndex: 0, spotIndex: 1, playerIndex: 0, points: 1 },
+  {
+    type: "normalChickClaimed",
+    slotIndex: 0,
+    spotIndex: 1,
+    playerIndex: 0,
+    points: 1,
+  },
 ];
 
 describe("MatchPresentationFeedback", () => {
@@ -137,7 +143,15 @@ describe("MatchPresentationFeedback", () => {
   it("uses normal chick points from the claim event for the score echo", () => {
     const feedback = createFeedback();
     const commands = feedback.update(
-      [{ type: "normalChickClaimed", slotIndex: 0, spotIndex: 1, playerIndex: 0, points: 3 }],
+      [
+        {
+          type: "normalChickClaimed",
+          slotIndex: 0,
+          spotIndex: 1,
+          playerIndex: 0,
+          points: 3,
+        },
+      ],
       1000,
     );
     const echo = findEcho(commands);
@@ -163,9 +177,7 @@ describe("MatchPresentationFeedback", () => {
 
   it("returns an sfx command with greenChickAppear when the green chick appears", () => {
     const feedback = createFeedback();
-    const events: MatchEvent[] = [
-      { type: "greenChickAppeared", spotIndex: 0 },
-    ];
+    const events: MatchEvent[] = [{ type: "greenChickAppeared", spotIndex: 0 }];
     const commands = feedback.update(events, 5000);
     const sfx = findSfx(commands);
     expect(sfx).toBeDefined();
@@ -204,7 +216,10 @@ describe("MatchPresentationFeedback", () => {
       { type: "greenChickClaimed", spotIndex: 0, playerIndex: 0 },
     ];
     feedback.update(events, 5000);
-    const commands = feedback.update([], 5000 + GREEN_CLAIM_BEAT_DURATION_MS / 2);
+    const commands = feedback.update(
+      [],
+      5000 + GREEN_CLAIM_BEAT_DURATION_MS / 2,
+    );
     const beat = findGreenBeat(commands);
     expect(beat).toBeDefined();
     expect(beat!.progress).toBeGreaterThan(0);
@@ -218,16 +233,17 @@ describe("MatchPresentationFeedback", () => {
       { type: "greenChickClaimed", spotIndex: 0, playerIndex: 0 },
     ];
     feedback.update(events, 5000);
-    const commands = feedback.update([], 5000 + GREEN_CLAIM_BEAT_DURATION_MS + 50);
+    const commands = feedback.update(
+      [],
+      5000 + GREEN_CLAIM_BEAT_DURATION_MS + 50,
+    );
     const beat = findGreenBeat(commands);
     expect(beat).toBeUndefined();
   });
 
   it("handles greenChickMissed events without crashing", () => {
     const feedback = createFeedback();
-    const events: MatchEvent[] = [
-      { type: "greenChickMissed", spotIndex: 0 },
-    ];
+    const events: MatchEvent[] = [{ type: "greenChickMissed", spotIndex: 0 }];
     const commands = feedback.update(events, 5000);
     expect(commands).toEqual([]);
   });
@@ -292,7 +308,10 @@ describe("MatchPresentationFeedback", () => {
       { type: "greenChickClaimed", spotIndex: 0, playerIndex: 0 },
     ];
     feedback.update(events, 5000);
-    const commands = feedback.update([], 5000 + GREEN_CLAIM_BEAT_DURATION_MS / 2);
+    const commands = feedback.update(
+      [],
+      5000 + GREEN_CLAIM_BEAT_DURATION_MS / 2,
+    );
     const beat = findGreenBeat(commands);
     expect(beat).toBeDefined();
     // With 4.0 peak scale, the halfway point should be significantly higher than default 2.8

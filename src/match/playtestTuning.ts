@@ -59,7 +59,9 @@ export interface TuningValidationContext {
   hidingSpotCount?: number;
 }
 
-export function createTuningDraft(context?: TuningValidationContext): TuningDraft {
+export function createTuningDraft(
+  context?: TuningValidationContext,
+): TuningDraft {
   const saved = loadTuning(context);
   const applied = saved ?? PRODUCTION_TUNING;
   return { draft: { ...applied }, applied };
@@ -142,7 +144,10 @@ export function parseChance(input: string): number | null {
   return null;
 }
 
-export function parseSpeed(input: string, productionDefault: number): number | null {
+export function parseSpeed(
+  input: string,
+  productionDefault: number,
+): number | null {
   const trimmed = input.trim();
   if (trimmed.length === 0) return null;
 
@@ -177,7 +182,12 @@ function isNonNegativeFinite(val: unknown): val is number {
 }
 
 function isPositiveInteger(val: unknown): val is number {
-  return typeof val === "number" && Number.isFinite(val) && val >= 1 && Number.isInteger(val);
+  return (
+    typeof val === "number" &&
+    Number.isFinite(val) &&
+    val >= 1 &&
+    Number.isInteger(val)
+  );
 }
 
 export function validateTuning(
@@ -303,7 +313,12 @@ export function validateTuning(
       message: "Reaction delay max must be greater than min",
     });
   }
-  if (typeof tuning.indecisionChance !== "number" || !Number.isFinite(tuning.indecisionChance) || tuning.indecisionChance < 0 || tuning.indecisionChance > 1) {
+  if (
+    typeof tuning.indecisionChance !== "number" ||
+    !Number.isFinite(tuning.indecisionChance) ||
+    tuning.indecisionChance < 0 ||
+    tuning.indecisionChance > 1
+  ) {
     errors.push({
       field: "indecisionChance",
       message: "Must be a number between 0 and 1",
@@ -315,7 +330,12 @@ export function validateTuning(
       message: "Must be a positive finite number",
     });
   }
-  if (typeof tuning.farTargetChance !== "number" || !Number.isFinite(tuning.farTargetChance) || tuning.farTargetChance < 0 || tuning.farTargetChance > 1) {
+  if (
+    typeof tuning.farTargetChance !== "number" ||
+    !Number.isFinite(tuning.farTargetChance) ||
+    tuning.farTargetChance < 0 ||
+    tuning.farTargetChance > 1
+  ) {
     errors.push({
       field: "farTargetChance",
       message: "Must be a number between 0 and 1",
@@ -376,12 +396,15 @@ export function isDefaultTuning(tuning: PlaytestTuning): boolean {
     tuning.normalPeekDurationMs === PRODUCTION_TUNING.normalPeekDurationMs &&
     tuning.normalRefillMinMs === PRODUCTION_TUNING.normalRefillMinMs &&
     tuning.normalRefillMaxMs === PRODUCTION_TUNING.normalRefillMaxMs &&
-    tuning.peekAnticipationDurationMs === PRODUCTION_TUNING.peekAnticipationDurationMs &&
+    tuning.peekAnticipationDurationMs ===
+      PRODUCTION_TUNING.peekAnticipationDurationMs &&
     tuning.normalChickPoints === PRODUCTION_TUNING.normalChickPoints &&
     tuning.greenChickEnabled === PRODUCTION_TUNING.greenChickEnabled &&
     tuning.greenChickPoints === PRODUCTION_TUNING.greenChickPoints &&
-    tuning.greenChickScheduleMinMs === PRODUCTION_TUNING.greenChickScheduleMinMs &&
-    tuning.greenChickScheduleMaxMs === PRODUCTION_TUNING.greenChickScheduleMaxMs &&
+    tuning.greenChickScheduleMinMs ===
+      PRODUCTION_TUNING.greenChickScheduleMinMs &&
+    tuning.greenChickScheduleMaxMs ===
+      PRODUCTION_TUNING.greenChickScheduleMaxMs &&
     tuning.playerSpeed === PRODUCTION_TUNING.playerSpeed &&
     tuning.botSpeed === PRODUCTION_TUNING.botSpeed &&
     tuning.reactionDelayMinMs === PRODUCTION_TUNING.reactionDelayMinMs &&
@@ -389,9 +412,11 @@ export function isDefaultTuning(tuning: PlaytestTuning): boolean {
     tuning.indecisionChance === PRODUCTION_TUNING.indecisionChance &&
     tuning.indecisionDurationMs === PRODUCTION_TUNING.indecisionDurationMs &&
     tuning.farTargetChance === PRODUCTION_TUNING.farTargetChance &&
-    tuning.claimFeedbackDurationMs === PRODUCTION_TUNING.claimFeedbackDurationMs &&
+    tuning.claimFeedbackDurationMs ===
+      PRODUCTION_TUNING.claimFeedbackDurationMs &&
     tuning.claimPopPeakScale === PRODUCTION_TUNING.claimPopPeakScale &&
-    tuning.greenClaimBeatDurationMs === PRODUCTION_TUNING.greenClaimBeatDurationMs &&
+    tuning.greenClaimBeatDurationMs ===
+      PRODUCTION_TUNING.greenClaimBeatDurationMs &&
     tuning.greenClaimBeatPeakScale === PRODUCTION_TUNING.greenClaimBeatPeakScale
   );
 }
@@ -404,37 +429,149 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function loadTuning(context?: TuningValidationContext): PlaytestTuning | null {
+export function loadTuning(
+  context?: TuningValidationContext,
+): PlaytestTuning | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return null;
     const c = parsed;
-    if (typeof c.matchDurationMs !== "number" || !Number.isFinite(c.matchDurationMs) || c.matchDurationMs <= 0) return null;
+    if (
+      typeof c.matchDurationMs !== "number" ||
+      !Number.isFinite(c.matchDurationMs) ||
+      c.matchDurationMs <= 0
+    )
+      return null;
     const candidate: PlaytestTuning = {
       matchDurationMs: c.matchDurationMs,
-      normalPeekCount: typeof c.normalPeekCount === "number" && Number.isInteger(c.normalPeekCount) && c.normalPeekCount >= 1 ? c.normalPeekCount : PRODUCTION_TUNING.normalPeekCount,
-      normalPeekDurationMs: typeof c.normalPeekDurationMs === "number" && Number.isFinite(c.normalPeekDurationMs) && c.normalPeekDurationMs > 0 ? c.normalPeekDurationMs : PRODUCTION_TUNING.normalPeekDurationMs,
-      normalRefillMinMs: typeof c.normalRefillMinMs === "number" && Number.isFinite(c.normalRefillMinMs) && c.normalRefillMinMs > 0 ? c.normalRefillMinMs : PRODUCTION_TUNING.normalRefillMinMs,
-      normalRefillMaxMs: typeof c.normalRefillMaxMs === "number" && Number.isFinite(c.normalRefillMaxMs) && c.normalRefillMaxMs > 0 ? c.normalRefillMaxMs : PRODUCTION_TUNING.normalRefillMaxMs,
-      peekAnticipationDurationMs: typeof c.peekAnticipationDurationMs === "number" && Number.isFinite(c.peekAnticipationDurationMs) && c.peekAnticipationDurationMs > 0 ? c.peekAnticipationDurationMs : PRODUCTION_TUNING.peekAnticipationDurationMs,
-      normalChickPoints: typeof c.normalChickPoints === "number" && Number.isInteger(c.normalChickPoints) && c.normalChickPoints >= 1 ? c.normalChickPoints : PRODUCTION_TUNING.normalChickPoints,
-      greenChickEnabled: typeof c.greenChickEnabled === "boolean" ? c.greenChickEnabled : PRODUCTION_TUNING.greenChickEnabled,
-      greenChickPoints: typeof c.greenChickPoints === "number" && Number.isInteger(c.greenChickPoints) && c.greenChickPoints >= 1 ? c.greenChickPoints : PRODUCTION_TUNING.greenChickPoints,
-      greenChickScheduleMinMs: typeof c.greenChickScheduleMinMs === "number" && Number.isFinite(c.greenChickScheduleMinMs) && c.greenChickScheduleMinMs > 0 ? c.greenChickScheduleMinMs : PRODUCTION_TUNING.greenChickScheduleMinMs,
-      greenChickScheduleMaxMs: typeof c.greenChickScheduleMaxMs === "number" && Number.isFinite(c.greenChickScheduleMaxMs) && c.greenChickScheduleMaxMs > 0 ? c.greenChickScheduleMaxMs : PRODUCTION_TUNING.greenChickScheduleMaxMs,
-      playerSpeed: typeof c.playerSpeed === "number" && Number.isFinite(c.playerSpeed) && c.playerSpeed >= 0 ? c.playerSpeed : PRODUCTION_TUNING.playerSpeed,
-      botSpeed: typeof c.botSpeed === "number" && Number.isFinite(c.botSpeed) && c.botSpeed >= 0 ? c.botSpeed : PRODUCTION_TUNING.botSpeed,
-      reactionDelayMinMs: typeof c.reactionDelayMinMs === "number" && Number.isFinite(c.reactionDelayMinMs) && c.reactionDelayMinMs >= 0 ? c.reactionDelayMinMs : PRODUCTION_TUNING.reactionDelayMinMs,
-      reactionDelayMaxMs: typeof c.reactionDelayMaxMs === "number" && Number.isFinite(c.reactionDelayMaxMs) && c.reactionDelayMaxMs >= 0 ? c.reactionDelayMaxMs : PRODUCTION_TUNING.reactionDelayMaxMs,
-      indecisionChance: typeof c.indecisionChance === "number" && Number.isFinite(c.indecisionChance) && c.indecisionChance >= 0 && c.indecisionChance <= 1 ? c.indecisionChance : PRODUCTION_TUNING.indecisionChance,
-      indecisionDurationMs: typeof c.indecisionDurationMs === "number" && Number.isFinite(c.indecisionDurationMs) && c.indecisionDurationMs > 0 ? c.indecisionDurationMs : PRODUCTION_TUNING.indecisionDurationMs,
-      farTargetChance: typeof c.farTargetChance === "number" && Number.isFinite(c.farTargetChance) && c.farTargetChance >= 0 && c.farTargetChance <= 1 ? c.farTargetChance : PRODUCTION_TUNING.farTargetChance,
-      claimFeedbackDurationMs: typeof c.claimFeedbackDurationMs === "number" && Number.isFinite(c.claimFeedbackDurationMs) && c.claimFeedbackDurationMs > 0 ? c.claimFeedbackDurationMs : PRODUCTION_TUNING.claimFeedbackDurationMs,
-      claimPopPeakScale: typeof c.claimPopPeakScale === "number" && Number.isFinite(c.claimPopPeakScale) && c.claimPopPeakScale >= 0 ? c.claimPopPeakScale : PRODUCTION_TUNING.claimPopPeakScale,
-      greenClaimBeatDurationMs: typeof c.greenClaimBeatDurationMs === "number" && Number.isFinite(c.greenClaimBeatDurationMs) && c.greenClaimBeatDurationMs > 0 ? c.greenClaimBeatDurationMs : PRODUCTION_TUNING.greenClaimBeatDurationMs,
-      greenClaimBeatPeakScale: typeof c.greenClaimBeatPeakScale === "number" && Number.isFinite(c.greenClaimBeatPeakScale) && c.greenClaimBeatPeakScale >= 0 ? c.greenClaimBeatPeakScale : PRODUCTION_TUNING.greenClaimBeatPeakScale,
+      normalPeekCount:
+        typeof c.normalPeekCount === "number" &&
+        Number.isInteger(c.normalPeekCount) &&
+        c.normalPeekCount >= 1
+          ? c.normalPeekCount
+          : PRODUCTION_TUNING.normalPeekCount,
+      normalPeekDurationMs:
+        typeof c.normalPeekDurationMs === "number" &&
+        Number.isFinite(c.normalPeekDurationMs) &&
+        c.normalPeekDurationMs > 0
+          ? c.normalPeekDurationMs
+          : PRODUCTION_TUNING.normalPeekDurationMs,
+      normalRefillMinMs:
+        typeof c.normalRefillMinMs === "number" &&
+        Number.isFinite(c.normalRefillMinMs) &&
+        c.normalRefillMinMs > 0
+          ? c.normalRefillMinMs
+          : PRODUCTION_TUNING.normalRefillMinMs,
+      normalRefillMaxMs:
+        typeof c.normalRefillMaxMs === "number" &&
+        Number.isFinite(c.normalRefillMaxMs) &&
+        c.normalRefillMaxMs > 0
+          ? c.normalRefillMaxMs
+          : PRODUCTION_TUNING.normalRefillMaxMs,
+      peekAnticipationDurationMs:
+        typeof c.peekAnticipationDurationMs === "number" &&
+        Number.isFinite(c.peekAnticipationDurationMs) &&
+        c.peekAnticipationDurationMs > 0
+          ? c.peekAnticipationDurationMs
+          : PRODUCTION_TUNING.peekAnticipationDurationMs,
+      normalChickPoints:
+        typeof c.normalChickPoints === "number" &&
+        Number.isInteger(c.normalChickPoints) &&
+        c.normalChickPoints >= 1
+          ? c.normalChickPoints
+          : PRODUCTION_TUNING.normalChickPoints,
+      greenChickEnabled:
+        typeof c.greenChickEnabled === "boolean"
+          ? c.greenChickEnabled
+          : PRODUCTION_TUNING.greenChickEnabled,
+      greenChickPoints:
+        typeof c.greenChickPoints === "number" &&
+        Number.isInteger(c.greenChickPoints) &&
+        c.greenChickPoints >= 1
+          ? c.greenChickPoints
+          : PRODUCTION_TUNING.greenChickPoints,
+      greenChickScheduleMinMs:
+        typeof c.greenChickScheduleMinMs === "number" &&
+        Number.isFinite(c.greenChickScheduleMinMs) &&
+        c.greenChickScheduleMinMs > 0
+          ? c.greenChickScheduleMinMs
+          : PRODUCTION_TUNING.greenChickScheduleMinMs,
+      greenChickScheduleMaxMs:
+        typeof c.greenChickScheduleMaxMs === "number" &&
+        Number.isFinite(c.greenChickScheduleMaxMs) &&
+        c.greenChickScheduleMaxMs > 0
+          ? c.greenChickScheduleMaxMs
+          : PRODUCTION_TUNING.greenChickScheduleMaxMs,
+      playerSpeed:
+        typeof c.playerSpeed === "number" &&
+        Number.isFinite(c.playerSpeed) &&
+        c.playerSpeed >= 0
+          ? c.playerSpeed
+          : PRODUCTION_TUNING.playerSpeed,
+      botSpeed:
+        typeof c.botSpeed === "number" &&
+        Number.isFinite(c.botSpeed) &&
+        c.botSpeed >= 0
+          ? c.botSpeed
+          : PRODUCTION_TUNING.botSpeed,
+      reactionDelayMinMs:
+        typeof c.reactionDelayMinMs === "number" &&
+        Number.isFinite(c.reactionDelayMinMs) &&
+        c.reactionDelayMinMs >= 0
+          ? c.reactionDelayMinMs
+          : PRODUCTION_TUNING.reactionDelayMinMs,
+      reactionDelayMaxMs:
+        typeof c.reactionDelayMaxMs === "number" &&
+        Number.isFinite(c.reactionDelayMaxMs) &&
+        c.reactionDelayMaxMs >= 0
+          ? c.reactionDelayMaxMs
+          : PRODUCTION_TUNING.reactionDelayMaxMs,
+      indecisionChance:
+        typeof c.indecisionChance === "number" &&
+        Number.isFinite(c.indecisionChance) &&
+        c.indecisionChance >= 0 &&
+        c.indecisionChance <= 1
+          ? c.indecisionChance
+          : PRODUCTION_TUNING.indecisionChance,
+      indecisionDurationMs:
+        typeof c.indecisionDurationMs === "number" &&
+        Number.isFinite(c.indecisionDurationMs) &&
+        c.indecisionDurationMs > 0
+          ? c.indecisionDurationMs
+          : PRODUCTION_TUNING.indecisionDurationMs,
+      farTargetChance:
+        typeof c.farTargetChance === "number" &&
+        Number.isFinite(c.farTargetChance) &&
+        c.farTargetChance >= 0 &&
+        c.farTargetChance <= 1
+          ? c.farTargetChance
+          : PRODUCTION_TUNING.farTargetChance,
+      claimFeedbackDurationMs:
+        typeof c.claimFeedbackDurationMs === "number" &&
+        Number.isFinite(c.claimFeedbackDurationMs) &&
+        c.claimFeedbackDurationMs > 0
+          ? c.claimFeedbackDurationMs
+          : PRODUCTION_TUNING.claimFeedbackDurationMs,
+      claimPopPeakScale:
+        typeof c.claimPopPeakScale === "number" &&
+        Number.isFinite(c.claimPopPeakScale) &&
+        c.claimPopPeakScale >= 0
+          ? c.claimPopPeakScale
+          : PRODUCTION_TUNING.claimPopPeakScale,
+      greenClaimBeatDurationMs:
+        typeof c.greenClaimBeatDurationMs === "number" &&
+        Number.isFinite(c.greenClaimBeatDurationMs) &&
+        c.greenClaimBeatDurationMs > 0
+          ? c.greenClaimBeatDurationMs
+          : PRODUCTION_TUNING.greenClaimBeatDurationMs,
+      greenClaimBeatPeakScale:
+        typeof c.greenClaimBeatPeakScale === "number" &&
+        Number.isFinite(c.greenClaimBeatPeakScale) &&
+        c.greenClaimBeatPeakScale >= 0
+          ? c.greenClaimBeatPeakScale
+          : PRODUCTION_TUNING.greenClaimBeatPeakScale,
     };
     return validateTuning(candidate, context).length === 0 ? candidate : null;
   } catch {

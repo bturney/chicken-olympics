@@ -176,7 +176,9 @@ export class Match {
     }
 
     const slotIndex = this.peekState.peeks.findIndex(
-      (peek) => peek.activeSpotIndex === spotIndex && isPeekActive(peek, now, this.peekPressureConfig),
+      (peek) =>
+        peek.activeSpotIndex === spotIndex &&
+        isPeekActive(peek, now, this.peekPressureConfig),
     );
     const result = attemptClaim(
       this.matchState,
@@ -191,7 +193,15 @@ export class Match {
     this.peekState = result.peekState;
 
     if (!result.claimed || slotIndex === -1) return [];
-    return [{ type: "normalChickClaimed", slotIndex, spotIndex, playerIndex, points: this.peekPressureConfig.normalChickPoints }];
+    return [
+      {
+        type: "normalChickClaimed",
+        slotIndex,
+        spotIndex,
+        playerIndex,
+        points: this.peekPressureConfig.normalChickPoints,
+      },
+    ];
   }
 
   view(): MatchView {

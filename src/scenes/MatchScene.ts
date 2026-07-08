@@ -1,7 +1,5 @@
 import Phaser from "phaser";
-import {
-  type PlayerSlotCount,
-} from "../match/rules";
+import { type PlayerSlotCount } from "../match/rules";
 import { Match } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
 import {
@@ -769,7 +767,8 @@ export class MatchScene extends Phaser.Scene {
         return;
       }
 
-      const current = this.menuState.fieldValues[this.menuState.activeFieldIndex] ?? "";
+      const current =
+        this.menuState.fieldValues[this.menuState.activeFieldIndex] ?? "";
       let next: string | null = null;
       if (event.key === "Backspace") {
         next = current.slice(0, -1);
@@ -840,11 +839,15 @@ export class MatchScene extends Phaser.Scene {
       .setOrigin(0.5);
     this.menuContainer.add(title);
 
-    const legendText = this.add
-      .text(px + 14, py + titleAreaH + 2, "* = restart required", {
+    const legendText = this.add.text(
+      px + 14,
+      py + titleAreaH + 2,
+      "* = restart required",
+      {
         fontSize: "11px",
         color: "#ff8844",
-      });
+      },
+    );
     this.menuContainer.add(legendText);
 
     const inputW = 260;
@@ -859,12 +862,11 @@ export class MatchScene extends Phaser.Scene {
       if (field.section !== currentSection) {
         currentSection = field.section;
         const secY = py + titleAreaH + legendH + sectionYs[sectionIdx]!;
-        const secText = this.add
-          .text(labelX, secY, currentSection, {
-            fontSize: "12px",
-            color: "#aaccff",
-            fontStyle: "bold",
-          });
+        const secText = this.add.text(labelX, secY, currentSection, {
+          fontSize: "12px",
+          color: "#aaccff",
+          fontStyle: "bold",
+        });
         this.menuContainer.add(secText);
         this.menuSectionHeaders.push(secText);
         sectionIdx++;
@@ -876,42 +878,48 @@ export class MatchScene extends Phaser.Scene {
       const field = FIELDS[i]!;
       const rowY = py + titleAreaH + legendH + fieldYs[i]!;
 
-      const label = this.add
-        .text(labelX, rowY, field.label, {
-          fontSize: "12px",
-          color: "#ccccdd",
-        });
+      const label = this.add.text(labelX, rowY, field.label, {
+        fontSize: "12px",
+        color: "#ccccdd",
+      });
       this.menuContainer.add(label);
 
-      const unitHint = this.add
-        .text(inputX + inputW, rowY + 14, field.unitHint, {
+      const unitHint = this.add.text(
+        inputX + inputW,
+        rowY + 14,
+        field.unitHint,
+        {
           fontSize: "10px",
           color: "#888899",
-        });
+        },
+      );
       this.menuContainer.add(unitHint);
 
       const fieldBg = this.add.graphics();
-      const borderColor = i === this.menuState.activeFieldIndex ? 0x88bbff : 0x4488ff;
+      const borderColor =
+        i === this.menuState.activeFieldIndex ? 0x88bbff : 0x4488ff;
       fieldBg.fillStyle(0x222244, 1);
       fieldBg.fillRoundedRect(inputX, rowY - 1, inputW, 22, 3);
-      fieldBg.lineStyle(1, borderColor, i === this.menuState.activeFieldIndex ? 0.9 : 0.5);
+      fieldBg.lineStyle(
+        1,
+        borderColor,
+        i === this.menuState.activeFieldIndex ? 0.9 : 0.5,
+      );
       fieldBg.strokeRoundedRect(inputX, rowY - 1, inputW, 22, 3);
       this.menuContainer.add(fieldBg);
       this.menuFieldBgs[i] = fieldBg;
 
-      const fieldText = this.add
-        .text(inputX + 4, rowY + 1, "", {
-          fontSize: "13px",
-          color: "#ffffff",
-        });
+      const fieldText = this.add.text(inputX + 4, rowY + 1, "", {
+        fontSize: "13px",
+        color: "#ffffff",
+      });
       this.menuContainer.add(fieldText);
       this.menuFieldTexts[i] = fieldText;
 
-      const errorText = this.add
-        .text(inputX, rowY + 22, "", {
-          fontSize: "10px",
-          color: "#ff4444",
-        });
+      const errorText = this.add.text(inputX, rowY + 22, "", {
+        fontSize: "10px",
+        color: "#ff4444",
+      });
       this.menuContainer.add(errorText);
       this.menuErrorTexts[i] = errorText;
 
@@ -943,7 +951,12 @@ export class MatchScene extends Phaser.Scene {
     this.menuContainer.add(this.menuApplyBtn);
 
     this.menuRestartBtn = this.add
-      .text(this.menuApplyBtn.x + this.menuApplyBtn.width + btnGap, btnY, "Restart Match With Tuning", btnStyle)
+      .text(
+        this.menuApplyBtn.x + this.menuApplyBtn.width + btnGap,
+        btnY,
+        "Restart Match With Tuning",
+        btnStyle,
+      )
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", () => this.onRestartMatch());
     this.menuContainer.add(this.menuRestartBtn);
@@ -955,7 +968,12 @@ export class MatchScene extends Phaser.Scene {
     this.menuContainer.add(resetBtn);
 
     const defaultsBtn = this.add
-      .text(resetBtn.x + resetBtn.width + btnGap, btnY + 28, "Defaults / Clear Saved", btnStyle)
+      .text(
+        resetBtn.x + resetBtn.width + btnGap,
+        btnY + 28,
+        "Defaults / Clear Saved",
+        btnStyle,
+      )
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", () => this.onStageDefaults());
     this.menuContainer.add(defaultsBtn);
@@ -980,8 +998,13 @@ export class MatchScene extends Phaser.Scene {
       const displayText = i === activeIndex ? raw + "█" : raw;
       this.menuFieldTexts[i]?.setText(displayText);
 
-      const fieldErrors = this.menuState.errors.filter((e) => e.field === FIELDS[i]!.key);
-      const errMsg = fieldErrors.length > 0 ? fieldErrors.map((e) => e.message).join("; ") : "";
+      const fieldErrors = this.menuState.errors.filter(
+        (e) => e.field === FIELDS[i]!.key,
+      );
+      const errMsg =
+        fieldErrors.length > 0
+          ? fieldErrors.map((e) => e.message).join("; ")
+          : "";
       this.menuErrorTexts[i]?.setText(errMsg);
 
       const bg = this.menuFieldBgs[i];
@@ -997,9 +1020,10 @@ export class MatchScene extends Phaser.Scene {
         const inputW = 260;
         const px = (width - panelW) / 2;
         const inputX = px + panelW - 14 - inputW;
-        const contentH = this.menuFieldYs.length > 0
-          ? this.menuFieldYs[this.menuFieldYs.length - 1]! + rowH + rowGap
-          : 0;
+        const contentH =
+          this.menuFieldYs.length > 0
+            ? this.menuFieldYs[this.menuFieldYs.length - 1]! + rowH + rowGap
+            : 0;
         const panelH = titleAreaH + legendH + contentH + buttonAreaH;
         const py = (height - panelH) / 2;
         const ry = py + titleAreaH + legendH + this.menuFieldYs[i]!;

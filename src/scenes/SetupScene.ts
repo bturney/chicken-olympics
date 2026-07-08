@@ -63,17 +63,27 @@ export class SetupScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, SETUP_SCENE_LAYOUT.P1_LABEL_Y * WORLD_SCALE, "Player 1", {
-        fontSize: `${20 * WORLD_SCALE}px`,
-        color: "#ffffff",
-      })
+      .text(
+        width / 2,
+        SETUP_SCENE_LAYOUT.P1_LABEL_Y * WORLD_SCALE,
+        "Player 1",
+        {
+          fontSize: `${20 * WORLD_SCALE}px`,
+          color: "#ffffff",
+        },
+      )
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, SETUP_SCENE_LAYOUT.P2_LABEL_Y * WORLD_SCALE, "Player 2", {
-        fontSize: `${20 * WORLD_SCALE}px`,
-        color: "#ffffff",
-      })
+      .text(
+        width / 2,
+        SETUP_SCENE_LAYOUT.P2_LABEL_Y * WORLD_SCALE,
+        "Player 2",
+        {
+          fontSize: `${20 * WORLD_SCALE}px`,
+          color: "#ffffff",
+        },
+      )
       .setOrigin(0.5);
 
     this.createSwatchRow(0, P1_SWATCH_Y);
@@ -104,7 +114,8 @@ export class SetupScene extends Phaser.Scene {
 
     const { height } = this.scale;
 
-    const controlStripText = "P1: WASD  |  P2: Arrows  |  Claim chicks to score!";
+    const controlStripText =
+      "P1: WASD  |  P2: Arrows  |  Claim chicks to score!";
     const controlFontSize = 13 * WORLD_SCALE;
     const controlPaddingX = 16 * WORLD_SCALE;
     const controlPaddingY = 8 * WORLD_SCALE;

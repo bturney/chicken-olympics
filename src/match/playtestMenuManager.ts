@@ -17,7 +17,10 @@ import {
   cloneTuning,
 } from "./playtestTuning";
 
-export type FieldParser = (raw: string) => { parsed: unknown; error: string | null };
+export type FieldParser = (raw: string) => {
+  parsed: unknown;
+  error: string | null;
+};
 
 export interface FieldDef {
   key: string;
@@ -37,13 +40,19 @@ export const SECTIONS: string[] = [
   "Claim Feedback",
 ];
 
-export function parseDurationField(raw: string): { parsed: unknown; error: string | null } {
+export function parseDurationField(raw: string): {
+  parsed: unknown;
+  error: string | null;
+} {
   const val = parseDurationMs(raw);
   if (val === null) return { parsed: null, error: "Invalid duration" };
   return { parsed: val, error: null };
 }
 
-export function parseCountField(raw: string): { parsed: unknown; error: string | null } {
+export function parseCountField(raw: string): {
+  parsed: unknown;
+  error: string | null;
+} {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return { parsed: null, error: null };
   const val = parseCount(raw);
@@ -51,39 +60,62 @@ export function parseCountField(raw: string): { parsed: unknown; error: string |
   return { parsed: val, error: null };
 }
 
-export function parseBooleanField(raw: string): { parsed: unknown; error: string | null } {
+export function parseBooleanField(raw: string): {
+  parsed: unknown;
+  error: string | null;
+} {
   const val = parseBoolean(raw);
-  if (val === null) return { parsed: null, error: 'Must be true/false, 1/0, or yes/no' };
+  if (val === null)
+    return { parsed: null, error: "Must be true/false, 1/0, or yes/no" };
   return { parsed: val, error: null };
 }
 
-export function parseSpeedField(raw: string, productionDefault: number): { parsed: unknown; error: string | null } {
+export function parseSpeedField(
+  raw: string,
+  productionDefault: number,
+): { parsed: unknown; error: string | null } {
   const val = parseSpeed(raw, productionDefault);
-  if (val === null) return { parsed: null, error: "Invalid speed; use px/s or multiplier like 1.5x" };
+  if (val === null)
+    return {
+      parsed: null,
+      error: "Invalid speed; use px/s or multiplier like 1.5x",
+    };
   return { parsed: val, error: null };
 }
 
-export function parseChanceField(raw: string): { parsed: unknown; error: string | null } {
+export function parseChanceField(raw: string): {
+  parsed: unknown;
+  error: string | null;
+} {
   const val = parseChance(raw);
-  if (val === null) return { parsed: null, error: "Invalid chance; use decimal (0-1) or percent (0%-100%)" };
+  if (val === null)
+    return {
+      parsed: null,
+      error: "Invalid chance; use decimal (0-1) or percent (0%-100%)",
+    };
   return { parsed: val, error: null };
 }
 
-export function parseScaleField(raw: string): { parsed: unknown; error: string | null } {
+export function parseScaleField(raw: string): {
+  parsed: unknown;
+  error: string | null;
+} {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return { parsed: null, error: null };
   if (!/^\d+(?:\.\d+)?$/.test(trimmed)) {
     return { parsed: null, error: "Must be a non-negative finite number" };
   }
   const val = parseFloat(trimmed);
-  if (!Number.isFinite(val) || val < 0) return { parsed: null, error: "Must be a non-negative finite number" };
+  if (!Number.isFinite(val) || val < 0)
+    return { parsed: null, error: "Must be a non-negative finite number" };
   return { parsed: val, error: null };
 }
 
 export function formatFieldValue(key: string, tuning: PlaytestTuning): string {
   const tuningRecord = tuning as unknown as Record<string, unknown>;
   const val = tuningRecord[key];
-  if (key === "matchDurationMs" && typeof val === "number") return formatDurationMs(val);
+  if (key === "matchDurationMs" && typeof val === "number")
+    return formatDurationMs(val);
   if (key === "playerSpeed" || key === "botSpeed") return String(val);
   if (typeof val === "boolean") return val ? "true" : "false";
   if (typeof val === "number" || typeof val === "string") return String(val);
@@ -91,33 +123,187 @@ export function formatFieldValue(key: string, tuning: PlaytestTuning): string {
 }
 
 export const FIELDS: FieldDef[] = [
-  { key: "matchDurationMs", label: "Match Length", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Match" },
+  {
+    key: "matchDurationMs",
+    label: "Match Length",
+    unitHint: "(ms, s, m)",
+    restartRequired: true,
+    parser: parseDurationField,
+    section: "Match",
+  },
 
-  { key: "playerSpeed", label: "Player Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.playerSpeed), section: "Chicken Cursor Responsiveness" },
-  { key: "botSpeed", label: "Bot Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.botSpeed), section: "Chicken Cursor Responsiveness" },
+  {
+    key: "playerSpeed",
+    label: "Player Speed",
+    unitHint: "(px/s, 1.5x)",
+    restartRequired: false,
+    parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.playerSpeed),
+    section: "Chicken Cursor Responsiveness",
+  },
+  {
+    key: "botSpeed",
+    label: "Bot Speed",
+    unitHint: "(px/s, 1.5x)",
+    restartRequired: false,
+    parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.botSpeed),
+    section: "Chicken Cursor Responsiveness",
+  },
 
-  { key: "normalPeekCount", label: "Normal Peek count", unitHint: "(whole number)", restartRequired: true, parser: parseCountField, section: "Peek Pressure" },
-  { key: "normalPeekDurationMs", label: "Peek duration", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
-  { key: "normalRefillMinMs", label: "Refill min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
-  { key: "normalRefillMaxMs", label: "Refill max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
-  { key: "peekAnticipationDurationMs", label: "Peek Anticipation", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Peek Pressure" },
-  { key: "normalChickPoints", label: "Normal chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField, section: "Peek Pressure" },
+  {
+    key: "normalPeekCount",
+    label: "Normal Peek count",
+    unitHint: "(whole number)",
+    restartRequired: true,
+    parser: parseCountField,
+    section: "Peek Pressure",
+  },
+  {
+    key: "normalPeekDurationMs",
+    label: "Peek duration",
+    unitHint: "(ms, s, m)",
+    restartRequired: true,
+    parser: parseDurationField,
+    section: "Peek Pressure",
+  },
+  {
+    key: "normalRefillMinMs",
+    label: "Refill min",
+    unitHint: "(ms, s, m)",
+    restartRequired: true,
+    parser: parseDurationField,
+    section: "Peek Pressure",
+  },
+  {
+    key: "normalRefillMaxMs",
+    label: "Refill max",
+    unitHint: "(ms, s, m)",
+    restartRequired: true,
+    parser: parseDurationField,
+    section: "Peek Pressure",
+  },
+  {
+    key: "peekAnticipationDurationMs",
+    label: "Peek Anticipation",
+    unitHint: "(ms, s, m)",
+    restartRequired: true,
+    parser: parseDurationField,
+    section: "Peek Pressure",
+  },
+  {
+    key: "normalChickPoints",
+    label: "Normal chick points",
+    unitHint: "(whole number)",
+    restartRequired: true,
+    parser: parseCountField,
+    section: "Peek Pressure",
+  },
 
-  { key: "greenChickEnabled", label: "Green Chick enabled", unitHint: "(true/false)", restartRequired: true, parser: parseBooleanField, section: "Green Chick" },
-  { key: "greenChickPoints", label: "Green Chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField, section: "Green Chick" },
-  { key: "greenChickScheduleMinMs", label: "Green Chick schedule min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Green Chick" },
-  { key: "greenChickScheduleMaxMs", label: "Green Chick schedule max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField, section: "Green Chick" },
+  {
+    key: "greenChickEnabled",
+    label: "Green Chick enabled",
+    unitHint: "(true/false)",
+    restartRequired: true,
+    parser: parseBooleanField,
+    section: "Green Chick",
+  },
+  {
+    key: "greenChickPoints",
+    label: "Green Chick points",
+    unitHint: "(whole number)",
+    restartRequired: true,
+    parser: parseCountField,
+    section: "Green Chick",
+  },
+  {
+    key: "greenChickScheduleMinMs",
+    label: "Green Chick schedule min",
+    unitHint: "(ms, s, m)",
+    restartRequired: true,
+    parser: parseDurationField,
+    section: "Green Chick",
+  },
+  {
+    key: "greenChickScheduleMaxMs",
+    label: "Green Chick schedule max",
+    unitHint: "(ms, s, m)",
+    restartRequired: true,
+    parser: parseDurationField,
+    section: "Green Chick",
+  },
 
-  { key: "reactionDelayMinMs", label: "Bot Reaction Delay min", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Bot Chicken Indecision" },
-  { key: "reactionDelayMaxMs", label: "Bot Reaction Delay max", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Bot Chicken Indecision" },
-  { key: "indecisionChance", label: "Bot Indecision chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField, section: "Bot Chicken Indecision" },
-  { key: "indecisionDurationMs", label: "Bot Indecision duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Bot Chicken Indecision" },
-  { key: "farTargetChance", label: "Bot Far Target chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField, section: "Bot Chicken Indecision" },
+  {
+    key: "reactionDelayMinMs",
+    label: "Bot Reaction Delay min",
+    unitHint: "(ms, s, m)",
+    restartRequired: false,
+    parser: parseDurationField,
+    section: "Bot Chicken Indecision",
+  },
+  {
+    key: "reactionDelayMaxMs",
+    label: "Bot Reaction Delay max",
+    unitHint: "(ms, s, m)",
+    restartRequired: false,
+    parser: parseDurationField,
+    section: "Bot Chicken Indecision",
+  },
+  {
+    key: "indecisionChance",
+    label: "Bot Indecision chance",
+    unitHint: "(0-1, 0%-100%)",
+    restartRequired: false,
+    parser: parseChanceField,
+    section: "Bot Chicken Indecision",
+  },
+  {
+    key: "indecisionDurationMs",
+    label: "Bot Indecision duration",
+    unitHint: "(ms, s, m)",
+    restartRequired: false,
+    parser: parseDurationField,
+    section: "Bot Chicken Indecision",
+  },
+  {
+    key: "farTargetChance",
+    label: "Bot Far Target chance",
+    unitHint: "(0-1, 0%-100%)",
+    restartRequired: false,
+    parser: parseChanceField,
+    section: "Bot Chicken Indecision",
+  },
 
-  { key: "claimFeedbackDurationMs", label: "Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Claim Feedback" },
-  { key: "claimPopPeakScale", label: "Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField, section: "Claim Feedback" },
-  { key: "greenClaimBeatDurationMs", label: "Green Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField, section: "Claim Feedback" },
-  { key: "greenClaimBeatPeakScale", label: "Green Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField, section: "Claim Feedback" },
+  {
+    key: "claimFeedbackDurationMs",
+    label: "Claim Beat duration",
+    unitHint: "(ms, s, m)",
+    restartRequired: false,
+    parser: parseDurationField,
+    section: "Claim Feedback",
+  },
+  {
+    key: "claimPopPeakScale",
+    label: "Claim Beat scale",
+    unitHint: "(non-negative number)",
+    restartRequired: false,
+    parser: parseScaleField,
+    section: "Claim Feedback",
+  },
+  {
+    key: "greenClaimBeatDurationMs",
+    label: "Green Claim Beat duration",
+    unitHint: "(ms, s, m)",
+    restartRequired: false,
+    parser: parseDurationField,
+    section: "Claim Feedback",
+  },
+  {
+    key: "greenClaimBeatPeakScale",
+    label: "Green Claim Beat scale",
+    unitHint: "(non-negative number)",
+    restartRequired: false,
+    parser: parseScaleField,
+    section: "Claim Feedback",
+  },
 ];
 
 function buildFieldValues(tuning: PlaytestTuning): string[] {
@@ -205,7 +391,11 @@ export function updateFieldValue(
 ): PlaytestMenuState {
   const newFieldValues = [...state.fieldValues];
   newFieldValues[state.activeFieldIndex] = raw;
-  const { draft, errors } = applyFieldValues(state.draft, newFieldValues, state.validationContext);
+  const { draft, errors } = applyFieldValues(
+    state.draft,
+    newFieldValues,
+    state.validationContext,
+  );
   return { ...state, draft, fieldValues: newFieldValues, errors };
 }
 
@@ -216,7 +406,11 @@ export function updateFieldValueAt(
 ): PlaytestMenuState {
   const newFieldValues = [...state.fieldValues];
   newFieldValues[index] = raw;
-  const { draft, errors } = applyFieldValues(state.draft, newFieldValues, state.validationContext);
+  const { draft, errors } = applyFieldValues(
+    state.draft,
+    newFieldValues,
+    state.validationContext,
+  );
   return { ...state, draft, fieldValues: newFieldValues, errors };
 }
 

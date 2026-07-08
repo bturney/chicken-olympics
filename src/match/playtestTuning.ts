@@ -12,6 +12,8 @@ export interface PlaytestTuning {
   greenChickPoints: number;
   greenChickScheduleMinMs: number;
   greenChickScheduleMaxMs: number;
+  playerSpeed: number;
+  botSpeed: number;
 }
 
 export const PRODUCTION_TUNING: PlaytestTuning = {
@@ -26,6 +28,8 @@ export const PRODUCTION_TUNING: PlaytestTuning = {
   greenChickPoints: 5,
   greenChickScheduleMinMs: 20_000,
   greenChickScheduleMaxMs: 70_000,
+  playerSpeed: 400,
+  botSpeed: 400,
 };
 
 export interface TuningDraft {
@@ -88,6 +92,27 @@ export function formatDurationMs(ms: number): string {
   return `${ms}ms`;
 }
 
+export function parseSpeed(input: string, productionDefault: number): number | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return null;
+
+  const xMatch = trimmed.match(/^(\d+(?:\.\d+)?)x$/);
+  if (xMatch) {
+    const multiplier = parseFloat(xMatch[1]!);
+    if (!Number.isFinite(multiplier) || multiplier < 0) return null;
+    return multiplier * productionDefault;
+  }
+
+  const numMatch = trimmed.match(/^(\d+(?:\.\d+)?)$/);
+  if (numMatch) {
+    const val = parseFloat(numMatch[1]!);
+    if (!Number.isFinite(val) || val < 0) return null;
+    return val;
+  }
+
+  return null;
+}
+
 export interface ValidationError {
   field: string;
   message: string;
@@ -95,6 +120,10 @@ export interface ValidationError {
 
 function isPositiveFinite(val: unknown): val is number {
   return typeof val === "number" && Number.isFinite(val) && val > 0;
+}
+
+function isNonNegativeFinite(val: unknown): val is number {
+  return typeof val === "number" && Number.isFinite(val) && val >= 0;
 }
 
 function isPositiveInteger(val: unknown): val is number {
@@ -181,6 +210,18 @@ export function validateTuning(tuning: PlaytestTuning): ValidationError[] {
       message: "Must be true or false",
     });
   }
+  if (!isNonNegativeFinite(tuning.playerSpeed)) {
+    errors.push({
+      field: "playerSpeed",
+      message: "Must be a non-negative finite number",
+    });
+  }
+  if (!isNonNegativeFinite(tuning.botSpeed)) {
+    errors.push({
+      field: "botSpeed",
+      message: "Must be a non-negative finite number",
+    });
+  }
   return errors;
 }
 
@@ -217,7 +258,9 @@ export function isDefaultTuning(tuning: PlaytestTuning): boolean {
     tuning.greenChickEnabled === PRODUCTION_TUNING.greenChickEnabled &&
     tuning.greenChickPoints === PRODUCTION_TUNING.greenChickPoints &&
     tuning.greenChickScheduleMinMs === PRODUCTION_TUNING.greenChickScheduleMinMs &&
-    tuning.greenChickScheduleMaxMs === PRODUCTION_TUNING.greenChickScheduleMaxMs
+    tuning.greenChickScheduleMaxMs === PRODUCTION_TUNING.greenChickScheduleMaxMs &&
+    tuning.playerSpeed === PRODUCTION_TUNING.playerSpeed &&
+    tuning.botSpeed === PRODUCTION_TUNING.botSpeed
   );
 }
 
@@ -249,6 +292,8 @@ export function loadTuning(): PlaytestTuning | null {
       greenChickPoints: typeof c.greenChickPoints === "number" && Number.isInteger(c.greenChickPoints) && c.greenChickPoints >= 1 ? c.greenChickPoints : PRODUCTION_TUNING.greenChickPoints,
       greenChickScheduleMinMs: typeof c.greenChickScheduleMinMs === "number" && Number.isFinite(c.greenChickScheduleMinMs) && c.greenChickScheduleMinMs > 0 ? c.greenChickScheduleMinMs : PRODUCTION_TUNING.greenChickScheduleMinMs,
       greenChickScheduleMaxMs: typeof c.greenChickScheduleMaxMs === "number" && Number.isFinite(c.greenChickScheduleMaxMs) && c.greenChickScheduleMaxMs > 0 ? c.greenChickScheduleMaxMs : PRODUCTION_TUNING.greenChickScheduleMaxMs,
+      playerSpeed: typeof c.playerSpeed === "number" && Number.isFinite(c.playerSpeed) && c.playerSpeed >= 0 ? c.playerSpeed : PRODUCTION_TUNING.playerSpeed,
+      botSpeed: typeof c.botSpeed === "number" && Number.isFinite(c.botSpeed) && c.botSpeed >= 0 ? c.botSpeed : PRODUCTION_TUNING.botSpeed,
     };
   } catch {
     return null;

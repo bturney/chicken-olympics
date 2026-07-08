@@ -40,8 +40,18 @@ import {
 } from "../src/match/playtestMenuManager";
 
 describe("FIELDS", () => {
-  it("has all 11 tuning fields", () => {
-    expect(FIELDS).toHaveLength(11);
+  it("has all 13 tuning fields", () => {
+    expect(FIELDS).toHaveLength(13);
+  });
+
+  it("includes player speed and bot speed as live-applicable fields", () => {
+    const playerSpeedField = FIELDS.find((f) => f.key === "playerSpeed");
+    expect(playerSpeedField).toBeDefined();
+    expect(playerSpeedField!.restartRequired).toBe(false);
+
+    const botSpeedField = FIELDS.find((f) => f.key === "botSpeed");
+    expect(botSpeedField).toBeDefined();
+    expect(botSpeedField!.restartRequired).toBe(false);
   });
 });
 
@@ -125,6 +135,22 @@ describe("updateFieldValue", () => {
     const state = createPlaytestMenuState();
     const updated = updateFieldValue(state, "not-valid");
     expect(updated.fieldValues[0]).toBe("not-valid");
+  });
+
+  it("parses a speed multiplier for the playerSpeed field", () => {
+    const state = createPlaytestMenuState();
+    const speedIndex = FIELDS.findIndex((f) => f.key === "playerSpeed");
+    const withActive = activateField(state, speedIndex);
+    const updated = updateFieldValue(withActive, "1.5x");
+    expect(updated.draft.draft.playerSpeed).toBe(600);
+  });
+
+  it("parses a plain number for the botSpeed field", () => {
+    const state = createPlaytestMenuState();
+    const speedIndex = FIELDS.findIndex((f) => f.key === "botSpeed");
+    const withActive = activateField(state, speedIndex);
+    const updated = updateFieldValue(withActive, "200");
+    expect(updated.draft.draft.botSpeed).toBe(200);
   });
 });
 

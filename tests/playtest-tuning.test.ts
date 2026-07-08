@@ -31,6 +31,7 @@ import {
   parseDurationMs,
   parseCount,
   parseBoolean,
+  parseSpeed,
   formatDurationMs,
   validateTuning,
   commitDraft,
@@ -60,6 +61,14 @@ describe("PRODUCTION_TUNING", () => {
 
   it("defaults green chick enabled to true", () => {
     expect(PRODUCTION_TUNING.greenChickEnabled).toBe(true);
+  });
+
+  it("defaults player speed to 400 px/s", () => {
+    expect(PRODUCTION_TUNING.playerSpeed).toBe(400);
+  });
+
+  it("defaults bot speed to 400 px/s", () => {
+    expect(PRODUCTION_TUNING.botSpeed).toBe(400);
   });
 });
 
@@ -171,6 +180,56 @@ describe("parseDurationMs", () => {
 describe("formatDurationMs", () => {
   it("formats milliseconds as a ms string", () => {
     expect(formatDurationMs(90_000)).toBe("90000ms");
+  });
+});
+
+describe("parseSpeed", () => {
+  it("parses a plain number as pixels per second", () => {
+    expect(parseSpeed("400", 400)).toBe(400);
+  });
+
+  it("parses a number different from production default", () => {
+    expect(parseSpeed("600", 400)).toBe(600);
+  });
+
+  it("parses a multiplier syntax 1.5x", () => {
+    expect(parseSpeed("1.5x", 400)).toBe(600);
+  });
+
+  it("parses a multiplier syntax 0.5x", () => {
+    expect(parseSpeed("0.5x", 400)).toBe(200);
+  });
+
+  it("parses a multiplier syntax 2x", () => {
+    expect(parseSpeed("2x", 400)).toBe(800);
+  });
+
+  it("parses zero as a valid speed", () => {
+    expect(parseSpeed("0", 400)).toBe(0);
+  });
+
+  it("returns null for negative plain number", () => {
+    expect(parseSpeed("-100", 400)).toBeNull();
+  });
+
+  it("returns null for negative multiplier", () => {
+    expect(parseSpeed("-1.5x", 400)).toBeNull();
+  });
+
+  it("returns null for non-numeric text", () => {
+    expect(parseSpeed("abc", 400)).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(parseSpeed("", 400)).toBeNull();
+  });
+
+  it("returns null for infinity", () => {
+    expect(parseSpeed("Infinity", 400)).toBeNull();
+  });
+
+  it("uses the correct production default for multiplier", () => {
+    expect(parseSpeed("2x", 500)).toBe(1000);
   });
 });
 
@@ -292,6 +351,36 @@ describe("validateTuning", () => {
     const errors = validateTuning(fullTuning({ greenChickEnabled: "yes" as unknown as boolean }));
     expect(errors.some((e) => e.field === "greenChickEnabled")).toBe(true);
   });
+
+  it("rejects negative playerSpeed", () => {
+    const errors = validateTuning(fullTuning({ playerSpeed: -1 }));
+    expect(errors.some((e) => e.field === "playerSpeed")).toBe(true);
+  });
+
+  it("accepts zero playerSpeed", () => {
+    const errors = validateTuning(fullTuning({ playerSpeed: 0 }));
+    expect(errors.some((e) => e.field === "playerSpeed")).toBe(false);
+  });
+
+  it("rejects NaN playerSpeed", () => {
+    const errors = validateTuning(fullTuning({ playerSpeed: Number.NaN }));
+    expect(errors.some((e) => e.field === "playerSpeed")).toBe(true);
+  });
+
+  it("rejects Infinity playerSpeed", () => {
+    const errors = validateTuning(fullTuning({ playerSpeed: Number.POSITIVE_INFINITY }));
+    expect(errors.some((e) => e.field === "playerSpeed")).toBe(true);
+  });
+
+  it("rejects negative botSpeed", () => {
+    const errors = validateTuning(fullTuning({ botSpeed: -100 }));
+    expect(errors.some((e) => e.field === "botSpeed")).toBe(true);
+  });
+
+  it("accepts zero botSpeed", () => {
+    const errors = validateTuning(fullTuning({ botSpeed: 0 }));
+    expect(errors.some((e) => e.field === "botSpeed")).toBe(false);
+  });
 });
 
 describe("commitDraft", () => {
@@ -395,6 +484,27 @@ describe("loadTuning / clearTuning", () => {
     const loaded = loadTuning();
     expect(loaded!.matchDurationMs).toBe(120_000);
     expect(loaded!.normalPeekCount).toBe(PRODUCTION_TUNING.normalPeekCount);
+    expect(loaded!.playerSpeed).toBe(PRODUCTION_TUNING.playerSpeed);
+    expect(loaded!.botSpeed).toBe(PRODUCTION_TUNING.botSpeed);
+  });
+
+  it("loads saved data with playerSpeed and botSpeed", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ matchDurationMs: 120_000, playerSpeed: 600, botSpeed: 200 }),
+    );
+    const loaded = loadTuning();
+    expect(loaded!.playerSpeed).toBe(600);
+    expect(loaded!.botSpeed).toBe(200);
+  });
+
+  it("falls back to production playerSpeed when saved data has invalid value", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ matchDurationMs: 120_000, playerSpeed: "fast" }),
+    );
+    const loaded = loadTuning();
+    expect(loaded!.playerSpeed).toBe(PRODUCTION_TUNING.playerSpeed);
   });
 });
 
@@ -413,6 +523,14 @@ describe("isDefaultTuning", () => {
 
   it("returns false for a non-default green chick state", () => {
     expect(isDefaultTuning(fullTuning({ greenChickEnabled: false }))).toBe(false);
+  });
+
+  it("returns false for a non-default player speed", () => {
+    expect(isDefaultTuning(fullTuning({ playerSpeed: 600 }))).toBe(false);
+  });
+
+  it("returns false for a non-default bot speed", () => {
+    expect(isDefaultTuning(fullTuning({ botSpeed: 200 }))).toBe(false);
   });
 });
 
@@ -506,5 +624,15 @@ describe("Match with tuned Green Chick", () => {
     // schedule is scaled: 1000 * 100000 / 90000 ≈ 1111ms
     match.advance(1_200);
     expect(match.view().greenChick).not.toBeNull();
+  });
+});
+
+describe("Match with tuned speed", () => {
+  it("speed tuning is not passed to Match (uses scene-level live apply)", () => {
+    // Speed tuning is live-applicable at the scene level, not via MatchOptions.
+    // The computeMoveVelocity and tickBotChickenController seams already accept
+    // explicit speed parameters, so tuning is verified through those seams.
+    const match = new Match({ durationMs: 10_000, spotCount: 6 });
+    expect(match.view().remainingMs).toBe(10_000);
   });
 });

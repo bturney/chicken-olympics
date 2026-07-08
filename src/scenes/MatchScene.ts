@@ -70,7 +70,6 @@ const MATCH_SFX_MOMENTS: Record<MatchSfxId, SfxMoment> = {
 
 const PLAYER_SIZE = 28 * WORLD_SCALE;
 const CHICK_SIZE = 16 * WORLD_SCALE;
-const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
 const GREEN_CHICK_VISIBLE_SCALE = 1.35;
 
@@ -970,6 +969,14 @@ export class MatchScene extends Phaser.Scene {
     this.menuContainer.setVisible(false);
   }
 
+  private get playerSpeed(): number {
+    return this.menuState.draft.applied.playerSpeed;
+  }
+
+  private get botSpeed(): number {
+    return this.menuState.draft.applied.botSpeed;
+  }
+
   private handleMovement(): void {
     const p1IsBot = this.botSlots.includes(0);
     if (!p1IsBot) {
@@ -980,7 +987,7 @@ export class MatchScene extends Phaser.Scene {
           up: this.wasd.W.isDown,
           down: this.wasd.S.isDown,
         },
-        MOVE_SPEED,
+        this.playerSpeed,
       );
       this.p1Chicken.setVelocity(p1Velocity.vx, p1Velocity.vy);
     } else {
@@ -996,7 +1003,7 @@ export class MatchScene extends Phaser.Scene {
           up: this.arrows.up.isDown,
           down: this.arrows.down.isDown,
         },
-        MOVE_SPEED,
+        this.playerSpeed,
       );
       this.p2Chicken.setVelocity(p2Velocity.vx, p2Velocity.vy);
     } else {
@@ -1017,7 +1024,7 @@ export class MatchScene extends Phaser.Scene {
     const result = tickBotChickenController(controller, {
       botPosition: { x: chicken.x, y: chicken.y },
       elapsedMs: this.match.view().elapsedMs,
-      speed: MOVE_SPEED,
+      speed: this.botSpeed,
       visibleTargets: this.getVisibleBotTargets(),
     });
     this.botControllers.set(playerIndex, result.controller);

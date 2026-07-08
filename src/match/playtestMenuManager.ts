@@ -9,7 +9,9 @@ import {
   parseDurationMs,
   parseCount,
   parseBoolean,
+  parseSpeed,
   formatDurationMs,
+  PRODUCTION_TUNING,
   cloneTuning,
 } from "./playtestTuning";
 
@@ -43,10 +45,17 @@ export function parseBooleanField(raw: string): { parsed: unknown; error: string
   return { parsed: val, error: null };
 }
 
+export function parseSpeedField(raw: string, productionDefault: number): { parsed: unknown; error: string | null } {
+  const val = parseSpeed(raw, productionDefault);
+  if (val === null) return { parsed: null, error: "Invalid speed; use px/s or multiplier like 1.5x" };
+  return { parsed: val, error: null };
+}
+
 export function formatFieldValue(key: string, tuning: PlaytestTuning): string {
   const tuningRecord = tuning as unknown as Record<string, unknown>;
   const val = tuningRecord[key];
   if (key === "matchDurationMs" && typeof val === "number") return formatDurationMs(val);
+  if (key === "playerSpeed" || key === "botSpeed") return String(val);
   if (typeof val === "boolean") return val ? "true" : "false";
   if (typeof val === "number" || typeof val === "string") return String(val);
   return "";
@@ -64,6 +73,8 @@ export const FIELDS: FieldDef[] = [
   { key: "greenChickPoints", label: "Green Chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField },
   { key: "greenChickScheduleMinMs", label: "Green Chick schedule min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
   { key: "greenChickScheduleMaxMs", label: "Green Chick schedule max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+  { key: "playerSpeed", label: "Player Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.playerSpeed) },
+  { key: "botSpeed", label: "Bot Speed", unitHint: "(px/s, 1.5x)", restartRequired: false, parser: (raw) => parseSpeedField(raw, PRODUCTION_TUNING.botSpeed) },
 ];
 
 function buildFieldValues(tuning: PlaytestTuning): string[] {

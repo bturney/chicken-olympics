@@ -91,6 +91,22 @@ describe("PRODUCTION_TUNING", () => {
   it("defaults far target chance to 0.15", () => {
     expect(PRODUCTION_TUNING.farTargetChance).toBe(0.15);
   });
+
+  it("defaults claim feedback duration to 350 ms", () => {
+    expect(PRODUCTION_TUNING.claimFeedbackDurationMs).toBe(350);
+  });
+
+  it("defaults claim pop peak scale to 1.4", () => {
+    expect(PRODUCTION_TUNING.claimPopPeakScale).toBe(1.4);
+  });
+
+  it("defaults green claim beat duration to 850 ms", () => {
+    expect(PRODUCTION_TUNING.greenClaimBeatDurationMs).toBe(850);
+  });
+
+  it("defaults green claim beat peak scale to 2.8", () => {
+    expect(PRODUCTION_TUNING.greenClaimBeatPeakScale).toBe(2.8);
+  });
 });
 
 describe("parseCount", () => {
@@ -518,6 +534,46 @@ describe("validateTuning", () => {
     expect(errors.some((e) => e.field === "indecisionChance")).toBe(false);
     expect(errors.some((e) => e.field === "farTargetChance")).toBe(false);
   });
+
+  it("rejects negative claimFeedbackDurationMs", () => {
+    const errors = validateTuning(fullTuning({ claimFeedbackDurationMs: -50 }));
+    expect(errors.some((e) => e.field === "claimFeedbackDurationMs")).toBe(true);
+  });
+
+  it("accepts non-default claimFeedbackDurationMs", () => {
+    const errors = validateTuning(fullTuning({ claimFeedbackDurationMs: 500 }));
+    expect(errors.some((e) => e.field === "claimFeedbackDurationMs")).toBe(false);
+  });
+
+  it("rejects NaN claimPopPeakScale", () => {
+    const errors = validateTuning(fullTuning({ claimPopPeakScale: Number.NaN }));
+    expect(errors.some((e) => e.field === "claimPopPeakScale")).toBe(true);
+  });
+
+  it("accepts non-default claimPopPeakScale", () => {
+    const errors = validateTuning(fullTuning({ claimPopPeakScale: 2.0 }));
+    expect(errors.some((e) => e.field === "claimPopPeakScale")).toBe(false);
+  });
+
+  it("rejects negative greenClaimBeatDurationMs", () => {
+    const errors = validateTuning(fullTuning({ greenClaimBeatDurationMs: -100 }));
+    expect(errors.some((e) => e.field === "greenClaimBeatDurationMs")).toBe(true);
+  });
+
+  it("accepts non-default greenClaimBeatDurationMs", () => {
+    const errors = validateTuning(fullTuning({ greenClaimBeatDurationMs: 1000 }));
+    expect(errors.some((e) => e.field === "greenClaimBeatDurationMs")).toBe(false);
+  });
+
+  it("rejects Infinity greenClaimBeatPeakScale", () => {
+    const errors = validateTuning(fullTuning({ greenClaimBeatPeakScale: Number.POSITIVE_INFINITY }));
+    expect(errors.some((e) => e.field === "greenClaimBeatPeakScale")).toBe(true);
+  });
+
+  it("accepts non-default greenClaimBeatPeakScale", () => {
+    const errors = validateTuning(fullTuning({ greenClaimBeatPeakScale: 3.0 }));
+    expect(errors.some((e) => e.field === "greenClaimBeatPeakScale")).toBe(false);
+  });
 });
 
 describe("commitDraft", () => {
@@ -722,6 +778,22 @@ describe("isDefaultTuning", () => {
 
   it("returns false for a non-default far target chance", () => {
     expect(isDefaultTuning(fullTuning({ farTargetChance: 0.5 }))).toBe(false);
+  });
+
+  it("returns false for a non-default claim feedback duration", () => {
+    expect(isDefaultTuning(fullTuning({ claimFeedbackDurationMs: 500 }))).toBe(false);
+  });
+
+  it("returns false for a non-default claim pop peak scale", () => {
+    expect(isDefaultTuning(fullTuning({ claimPopPeakScale: 2.0 }))).toBe(false);
+  });
+
+  it("returns false for a non-default green claim beat duration", () => {
+    expect(isDefaultTuning(fullTuning({ greenClaimBeatDurationMs: 1000 }))).toBe(false);
+  });
+
+  it("returns false for a non-default green claim beat peak scale", () => {
+    expect(isDefaultTuning(fullTuning({ greenClaimBeatPeakScale: 3.0 }))).toBe(false);
   });
 });
 

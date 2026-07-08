@@ -58,6 +58,14 @@ export function parseChanceField(raw: string): { parsed: unknown; error: string 
   return { parsed: val, error: null };
 }
 
+export function parseScaleField(raw: string): { parsed: unknown; error: string | null } {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return { parsed: null, error: null };
+  const val = parseFloat(trimmed);
+  if (!Number.isFinite(val) || val < 0) return { parsed: null, error: "Must be a non-negative finite number" };
+  return { parsed: val, error: null };
+}
+
 export function formatFieldValue(key: string, tuning: PlaytestTuning): string {
   const tuningRecord = tuning as unknown as Record<string, unknown>;
   const val = tuningRecord[key];
@@ -87,6 +95,10 @@ export const FIELDS: FieldDef[] = [
   { key: "indecisionChance", label: "Bot Indecision chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField },
   { key: "indecisionDurationMs", label: "Bot Indecision duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
   { key: "farTargetChance", label: "Bot Far Target chance", unitHint: "(0-1, 0%-100%)", restartRequired: false, parser: parseChanceField },
+  { key: "claimFeedbackDurationMs", label: "Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
+  { key: "claimPopPeakScale", label: "Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField },
+  { key: "greenClaimBeatDurationMs", label: "Green Claim Beat duration", unitHint: "(ms, s, m)", restartRequired: false, parser: parseDurationField },
+  { key: "greenClaimBeatPeakScale", label: "Green Claim Beat scale", unitHint: "(non-negative number)", restartRequired: false, parser: parseScaleField },
 ];
 
 function buildFieldValues(tuning: PlaytestTuning): string[] {

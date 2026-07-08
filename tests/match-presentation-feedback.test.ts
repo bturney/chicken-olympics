@@ -220,4 +220,82 @@ describe("MatchPresentationFeedback", () => {
     const commands = feedback.update(events, 5000);
     expect(commands).toEqual([]);
   });
+
+  it("uses tuned claimFeedbackDurationMs from config", () => {
+    const feedback = new MatchPresentationFeedback({
+      spotPositions: SPOT_POSITIONS,
+      playerHexColors: PLAYER_HEX_COLORS,
+      playerCssColors: PLAYER_CSS_COLORS,
+      claimFeedbackDurationMs: 200,
+    });
+    feedback.update(CLAIM_EVENTS, 1000);
+    // At 200ms the beat should still be active
+    const commands1 = feedback.update([], 1000 + 150);
+    expect(findBeat(commands1)).toBeDefined();
+    // At 200ms the beat should have ended
+    const commands2 = feedback.update([], 1000 + 200);
+    expect(findBeat(commands2)).toBeUndefined();
+  });
+
+  it("uses tuned claimPopPeakScale from config", () => {
+    const feedback = new MatchPresentationFeedback({
+      spotPositions: SPOT_POSITIONS,
+      playerHexColors: PLAYER_HEX_COLORS,
+      playerCssColors: PLAYER_CSS_COLORS,
+      claimPopPeakScale: 2.0,
+    });
+    feedback.update(CLAIM_EVENTS, 1000);
+    const commands = feedback.update([], 1000 + CLAIM_DURATION_MS / 2);
+    const beat = findBeat(commands);
+    expect(beat).toBeDefined();
+    // At halfway with default 1.4 peak, scale would be ~1.2.
+    // With 2.0 peak, scale should reach ~1.5 at halfway
+    expect(beat!.scale).toBeGreaterThan(1.4);
+  });
+
+  it("uses tuned greenClaimBeatDurationMs from config", () => {
+    const feedback = new MatchPresentationFeedback({
+      spotPositions: SPOT_POSITIONS,
+      playerHexColors: PLAYER_HEX_COLORS,
+      playerCssColors: PLAYER_CSS_COLORS,
+      greenClaimBeatDurationMs: 400,
+    });
+    const events: MatchEvent[] = [
+      { type: "greenChickClaimed", spotIndex: 0, playerIndex: 0 },
+    ];
+    feedback.update(events, 5000);
+    const commands1 = feedback.update([], 5000 + 300);
+    expect(findGreenBeat(commands1)).toBeDefined();
+    const commands2 = feedback.update([], 5000 + 400);
+    expect(findGreenBeat(commands2)).toBeUndefined();
+  });
+
+  it("uses tuned greenClaimBeatPeakScale from config", () => {
+    const feedback = new MatchPresentationFeedback({
+      spotPositions: SPOT_POSITIONS,
+      playerHexColors: PLAYER_HEX_COLORS,
+      playerCssColors: PLAYER_CSS_COLORS,
+      greenClaimBeatPeakScale: 4.0,
+    });
+    const events: MatchEvent[] = [
+      { type: "greenChickClaimed", spotIndex: 0, playerIndex: 0 },
+    ];
+    feedback.update(events, 5000);
+    const commands = feedback.update([], 5000 + GREEN_CLAIM_BEAT_DURATION_MS / 2);
+    const beat = findGreenBeat(commands);
+    expect(beat).toBeDefined();
+    // With 4.0 peak scale, the halfway point should be significantly higher than default 2.8
+    expect(beat!.scale).toBeGreaterThan(2.0);
+  });
+
+  it("applies config update via applyConfig method mid-match", () => {
+    const feedback = createFeedback();
+    feedback.update(CLAIM_EVENTS, 1000);
+    // Shorter duration should make the beat end sooner
+    feedback.applyConfig({ claimFeedbackDurationMs: 50 });
+    const commands1 = feedback.update([], 1000 + 40);
+    expect(findBeat(commands1)).toBeDefined();
+    const commands2 = feedback.update([], 1000 + 50);
+    expect(findBeat(commands2)).toBeUndefined();
+  });
 });

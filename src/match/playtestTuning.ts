@@ -19,6 +19,10 @@ export interface PlaytestTuning {
   indecisionChance: number;
   indecisionDurationMs: number;
   farTargetChance: number;
+  claimFeedbackDurationMs: number;
+  claimPopPeakScale: number;
+  greenClaimBeatDurationMs: number;
+  greenClaimBeatPeakScale: number;
 }
 
 export const PRODUCTION_TUNING: PlaytestTuning = {
@@ -40,6 +44,10 @@ export const PRODUCTION_TUNING: PlaytestTuning = {
   indecisionChance: 0.25,
   indecisionDurationMs: 120,
   farTargetChance: 0.15,
+  claimFeedbackDurationMs: 350,
+  claimPopPeakScale: 1.4,
+  greenClaimBeatDurationMs: 850,
+  greenClaimBeatPeakScale: 2.8,
 };
 
 export interface TuningDraft {
@@ -289,6 +297,30 @@ export function validateTuning(tuning: PlaytestTuning): ValidationError[] {
       message: "Must be a number between 0 and 1",
     });
   }
+  if (!isPositiveFinite(tuning.claimFeedbackDurationMs)) {
+    errors.push({
+      field: "claimFeedbackDurationMs",
+      message: "Must be a positive finite number",
+    });
+  }
+  if (!isNonNegativeFinite(tuning.claimPopPeakScale)) {
+    errors.push({
+      field: "claimPopPeakScale",
+      message: "Must be a non-negative finite number",
+    });
+  }
+  if (!isPositiveFinite(tuning.greenClaimBeatDurationMs)) {
+    errors.push({
+      field: "greenClaimBeatDurationMs",
+      message: "Must be a positive finite number",
+    });
+  }
+  if (!isNonNegativeFinite(tuning.greenClaimBeatPeakScale)) {
+    errors.push({
+      field: "greenClaimBeatPeakScale",
+      message: "Must be a non-negative finite number",
+    });
+  }
   return errors;
 }
 
@@ -332,7 +364,11 @@ export function isDefaultTuning(tuning: PlaytestTuning): boolean {
     tuning.reactionDelayMaxMs === PRODUCTION_TUNING.reactionDelayMaxMs &&
     tuning.indecisionChance === PRODUCTION_TUNING.indecisionChance &&
     tuning.indecisionDurationMs === PRODUCTION_TUNING.indecisionDurationMs &&
-    tuning.farTargetChance === PRODUCTION_TUNING.farTargetChance
+    tuning.farTargetChance === PRODUCTION_TUNING.farTargetChance &&
+    tuning.claimFeedbackDurationMs === PRODUCTION_TUNING.claimFeedbackDurationMs &&
+    tuning.claimPopPeakScale === PRODUCTION_TUNING.claimPopPeakScale &&
+    tuning.greenClaimBeatDurationMs === PRODUCTION_TUNING.greenClaimBeatDurationMs &&
+    tuning.greenClaimBeatPeakScale === PRODUCTION_TUNING.greenClaimBeatPeakScale
   );
 }
 
@@ -371,6 +407,10 @@ export function loadTuning(): PlaytestTuning | null {
       indecisionChance: typeof c.indecisionChance === "number" && Number.isFinite(c.indecisionChance) && c.indecisionChance >= 0 && c.indecisionChance <= 1 ? c.indecisionChance : PRODUCTION_TUNING.indecisionChance,
       indecisionDurationMs: typeof c.indecisionDurationMs === "number" && Number.isFinite(c.indecisionDurationMs) && c.indecisionDurationMs > 0 ? c.indecisionDurationMs : PRODUCTION_TUNING.indecisionDurationMs,
       farTargetChance: typeof c.farTargetChance === "number" && Number.isFinite(c.farTargetChance) && c.farTargetChance >= 0 && c.farTargetChance <= 1 ? c.farTargetChance : PRODUCTION_TUNING.farTargetChance,
+      claimFeedbackDurationMs: typeof c.claimFeedbackDurationMs === "number" && Number.isFinite(c.claimFeedbackDurationMs) && c.claimFeedbackDurationMs > 0 ? c.claimFeedbackDurationMs : PRODUCTION_TUNING.claimFeedbackDurationMs,
+      claimPopPeakScale: typeof c.claimPopPeakScale === "number" && Number.isFinite(c.claimPopPeakScale) && c.claimPopPeakScale >= 0 ? c.claimPopPeakScale : PRODUCTION_TUNING.claimPopPeakScale,
+      greenClaimBeatDurationMs: typeof c.greenClaimBeatDurationMs === "number" && Number.isFinite(c.greenClaimBeatDurationMs) && c.greenClaimBeatDurationMs > 0 ? c.greenClaimBeatDurationMs : PRODUCTION_TUNING.greenClaimBeatDurationMs,
+      greenClaimBeatPeakScale: typeof c.greenClaimBeatPeakScale === "number" && Number.isFinite(c.greenClaimBeatPeakScale) && c.greenClaimBeatPeakScale >= 0 ? c.greenClaimBeatPeakScale : PRODUCTION_TUNING.greenClaimBeatPeakScale,
     };
   } catch {
     return null;

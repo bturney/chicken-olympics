@@ -176,6 +176,10 @@ export class MatchScene extends Phaser.Scene {
         0: getPlayerChickenCssHex(this.p1Color),
         1: getPlayerChickenCssHex(this.p2Color),
       },
+      claimFeedbackDurationMs: applied.claimFeedbackDurationMs,
+      claimPopPeakScale: applied.claimPopPeakScale,
+      greenClaimBeatDurationMs: applied.greenClaimBeatDurationMs,
+      greenClaimBeatPeakScale: applied.greenClaimBeatPeakScale,
     });
     this.transitioned = false;
     this.chickBodies = [];
@@ -942,9 +946,20 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
+  private get claimFeedbackConfig() {
+    const a = this.menuState.draft.applied;
+    return {
+      claimFeedbackDurationMs: a.claimFeedbackDurationMs,
+      claimPopPeakScale: a.claimPopPeakScale,
+      greenClaimBeatDurationMs: a.greenClaimBeatDurationMs,
+      greenClaimBeatPeakScale: a.greenClaimBeatPeakScale,
+    };
+  }
+
   private onApply(): void {
     if (this.menuState.errors.length > 0) return;
     this.menuState = applyTuning(this.menuState);
+    this.presentationFeedback.applyConfig(this.claimFeedbackConfig);
     this.renderPlaytestMenu();
   }
 

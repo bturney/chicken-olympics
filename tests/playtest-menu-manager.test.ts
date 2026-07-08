@@ -40,11 +40,11 @@ import {
 } from "../src/match/playtestMenuManager";
 
 describe("FIELDS", () => {
-  it("has all 18 tuning fields", () => {
-    expect(FIELDS).toHaveLength(18);
+  it("has all 22 tuning fields", () => {
+    expect(FIELDS).toHaveLength(22);
   });
 
-  it("includes bot indecision fields as live-applicable", () => {
+  it("includes bot indecision and claim feedback fields as live-applicable", () => {
     const checkLive = (key: string) => {
       const field = FIELDS.find((f) => f.key === key);
       expect(field).toBeDefined();
@@ -57,6 +57,10 @@ describe("FIELDS", () => {
     checkLive("indecisionChance");
     checkLive("indecisionDurationMs");
     checkLive("farTargetChance");
+    checkLive("claimFeedbackDurationMs");
+    checkLive("claimPopPeakScale");
+    checkLive("greenClaimBeatDurationMs");
+    checkLive("greenClaimBeatPeakScale");
   });
 });
 

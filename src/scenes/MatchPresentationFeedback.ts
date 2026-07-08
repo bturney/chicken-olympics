@@ -32,13 +32,20 @@ export interface MatchPresentationFeedbackConfig {
   spotPositions: readonly SpotPosition[];
   playerHexColors: Record<number, number>;
   playerCssColors: Record<number, string>;
+  claimFeedbackDurationMs?: number;
+  claimPopPeakScale?: number;
+  greenClaimBeatDurationMs?: number;
+  greenClaimBeatPeakScale?: number;
 }
 
-const CLAIM_FEEDBACK_DURATION_MS = 350;
-const CLAIM_POP_PEAK_SCALE = 1.4;
+const PRODUCTION_CONFIG = {
+  claimFeedbackDurationMs: 350,
+  claimPopPeakScale: 1.4,
+  greenClaimBeatDurationMs: 850,
+  greenClaimBeatPeakScale: 2.8,
+} as const;
+
 const NORMAL_CHICK_POINTS = 1;
-const GREEN_CLAIM_BEAT_DURATION_MS = 850;
-const GREEN_CLAIM_BEAT_PEAK_SCALE = 2.8;
 
 interface ClaimAnimation {
   slotIndex: number;
@@ -48,15 +55,15 @@ interface ClaimAnimation {
   durationMs: number;
 }
 
-function computeClaimPopScale(startedAtMs: number, now: number): number {
+function computeClaimPopScale(startedAtMs: number, now: number, durationMs: number, peakScale: number): number {
   if (now <= startedAtMs) return 1;
   const elapsed = now - startedAtMs;
-  if (elapsed >= CLAIM_FEEDBACK_DURATION_MS) return 0;
-  const progress = elapsed / CLAIM_FEEDBACK_DURATION_MS;
+  if (elapsed >= durationMs) return 0;
+  const progress = elapsed / durationMs;
   if (progress < 0.5) {
-    return 1 + (progress / 0.5) * (CLAIM_POP_PEAK_SCALE - 1);
+    return 1 + (progress / 0.5) * (peakScale - 1);
   }
-  return CLAIM_POP_PEAK_SCALE * (1 - (progress - 0.5) / 0.5);
+  return peakScale * (1 - (progress - 0.5) / 0.5);
 }
 
 interface GreenClaimBeatState {
@@ -65,15 +72,15 @@ interface GreenClaimBeatState {
   startedAtMs: number;
 }
 
-function computeGreenClaimBeatScale(startedAtMs: number, now: number): number {
+function computeGreenClaimBeatScale(startedAtMs: number, now: number, durationMs: number, peakScale: number): number {
   if (now <= startedAtMs) return 1;
   const elapsed = now - startedAtMs;
-  if (elapsed >= GREEN_CLAIM_BEAT_DURATION_MS) return 0;
-  const progress = elapsed / GREEN_CLAIM_BEAT_DURATION_MS;
+  if (elapsed >= durationMs) return 0;
+  const progress = elapsed / durationMs;
   if (progress < 0.45) {
-    return 1 + (progress / 0.45) * (GREEN_CLAIM_BEAT_PEAK_SCALE - 1);
+    return 1 + (progress / 0.45) * (peakScale - 1);
   }
-  return GREEN_CLAIM_BEAT_PEAK_SCALE * (1 - (progress - 0.45) / 0.55);
+  return peakScale * (1 - (progress - 0.45) / 0.55);
 }
 
 export class MatchPresentationFeedback {
@@ -82,11 +89,26 @@ export class MatchPresentationFeedback {
   private readonly playerCssColors: Record<PlayerIndex, string>;
   private claimAnimations: ClaimAnimation[] = [];
   private greenClaimBeat: GreenClaimBeatState | null = null;
+  private claimFeedbackDurationMs: number;
+  private claimPopPeakScale: number;
+  private greenClaimBeatDurationMs: number;
+  private greenClaimBeatPeakScale: number;
 
   constructor(config: MatchPresentationFeedbackConfig) {
     this.spotPositions = config.spotPositions;
     this.playerHexColors = config.playerHexColors;
     this.playerCssColors = config.playerCssColors;
+    this.claimFeedbackDurationMs = config.claimFeedbackDurationMs ?? PRODUCTION_CONFIG.claimFeedbackDurationMs;
+    this.claimPopPeakScale = config.claimPopPeakScale ?? PRODUCTION_CONFIG.claimPopPeakScale;
+    this.greenClaimBeatDurationMs = config.greenClaimBeatDurationMs ?? PRODUCTION_CONFIG.greenClaimBeatDurationMs;
+    this.greenClaimBeatPeakScale = config.greenClaimBeatPeakScale ?? PRODUCTION_CONFIG.greenClaimBeatPeakScale;
+  }
+
+  applyConfig(config: { claimFeedbackDurationMs?: number; claimPopPeakScale?: number; greenClaimBeatDurationMs?: number; greenClaimBeatPeakScale?: number }): void {
+    if (config.claimFeedbackDurationMs !== undefined) this.claimFeedbackDurationMs = config.claimFeedbackDurationMs;
+    if (config.claimPopPeakScale !== undefined) this.claimPopPeakScale = config.claimPopPeakScale;
+    if (config.greenClaimBeatDurationMs !== undefined) this.greenClaimBeatDurationMs = config.greenClaimBeatDurationMs;
+    if (config.greenClaimBeatPeakScale !== undefined) this.greenClaimBeatPeakScale = config.greenClaimBeatPeakScale;
   }
 
   update(events: MatchEvent[], elapsedMs: number): FeedbackCommand[] {
@@ -100,7 +122,7 @@ export class MatchPresentationFeedback {
             spotIndex: event.spotIndex,
             playerIndex: event.playerIndex,
             startedAtMs: elapsedMs,
-            durationMs: CLAIM_FEEDBACK_DURATION_MS,
+            durationMs: this.claimFeedbackDurationMs,
           });
           commands.push({
             type: "claimScoreEcho",
@@ -130,7 +152,7 @@ export class MatchPresentationFeedback {
     );
 
     for (const anim of this.claimAnimations) {
-      const scale = computeClaimPopScale(anim.startedAtMs, elapsedMs);
+      const scale = computeClaimPopScale(anim.startedAtMs, elapsedMs, this.claimFeedbackDurationMs, this.claimPopPeakScale);
       if (scale > 0) {
         commands.push({
           type: "normalClaimBeat",
@@ -146,11 +168,11 @@ export class MatchPresentationFeedback {
     if (this.greenClaimBeat !== null) {
       const beat = this.greenClaimBeat;
       const elapsed = elapsedMs - beat.startedAtMs;
-      if (elapsed >= GREEN_CLAIM_BEAT_DURATION_MS) {
+      if (elapsed >= this.greenClaimBeatDurationMs) {
         this.greenClaimBeat = null;
       } else {
-        const scale = computeGreenClaimBeatScale(beat.startedAtMs, elapsedMs);
-        const progress = elapsed / GREEN_CLAIM_BEAT_DURATION_MS;
+        const scale = computeGreenClaimBeatScale(beat.startedAtMs, elapsedMs, this.greenClaimBeatDurationMs, this.greenClaimBeatPeakScale);
+        const progress = elapsed / this.greenClaimBeatDurationMs;
         commands.push({
           type: "greenClaimBeat",
           spotIndex: beat.spotIndex,

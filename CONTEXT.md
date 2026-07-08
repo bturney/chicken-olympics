@@ -135,3 +135,7 @@ _Avoid_: Feedback manager, animation controller, presentation layer
 **Feedback Command**:
 A declarative data object the presentation feedback module returns to tell the scene what to render or play. Variants include normalClaimBeat (with computed scale), greenClaimBeat (with progress), claimScoreEcho, scoreBump, and sfx.
 _Avoid_: Signal, callback, event
+
+**Playtest Tuning Menu**:
+A hidden playtesting overlay that may ship but is not player-facing, used for adjusting match feel during local playtesting, focused on Peek Pressure, Chicken Cursor Responsiveness, Bot Chicken Indecision, and claim feedback rather than player-facing options.
+_Avoid_: Debug menu, settings menu, difficulty menu, cheat menu

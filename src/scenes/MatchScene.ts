@@ -1,15 +1,26 @@
 import Phaser from "phaser";
-import {
-  NORMAL_PEEK_COUNT,
-  type PlayerSlotCount,
-} from "../match/rules";
+import { type PlayerSlotCount } from "../match/rules";
 import { Match } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
+import {
+  FIELDS,
+  type PlaytestMenuState,
+  createPlaytestMenuState,
+  toggleMenu,
+  updateFieldValue,
+  activateField,
+  applyTuning,
+  resetDraftAction,
+  stageDefaultsAction,
+  closeMenu,
+} from "../match/playtestMenuManager";
+
 import {
   createBotChickenController,
   tickBotChickenController,
   type BotChickenController,
   type BotChickenTarget,
+  type BotChickenConfig,
 } from "../match/botChickenController";
 import { computeMoveVelocity } from "../match/movement";
 import {
@@ -58,7 +69,6 @@ const MATCH_SFX_MOMENTS: Record<MatchSfxId, SfxMoment> = {
 
 const PLAYER_SIZE = 28 * WORLD_SCALE;
 const CHICK_SIZE = 16 * WORLD_SCALE;
-const MOVE_SPEED = FARMYARD_LAYOUT.playerSpeed;
 
 const GREEN_CHICK_VISIBLE_SCALE = 1.35;
 
@@ -76,6 +86,20 @@ export class MatchScene extends Phaser.Scene {
   private playerSlotCount: PlayerSlotCount = 2;
   private botSlots: number[] = [];
   private botControllers = new Map<number, BotChickenController>();
+
+  private menuState!: PlaytestMenuState;
+  private menuContainer!: Phaser.GameObjects.Container;
+  private menuActive = false;
+  private sceneData!: MatchSceneData;
+  private menuFieldTexts: Phaser.GameObjects.Text[] = [];
+  private menuFieldBgs: Phaser.GameObjects.Graphics[] = [];
+  private menuErrorTexts: Phaser.GameObjects.Text[] = [];
+  private menuSectionHeaders: Phaser.GameObjects.Text[] = [];
+  /** Precomputed Y-positions for each field row (accounts for section headers) */
+  private menuFieldYs: number[] = [];
+  private menuApplyBtn!: Phaser.GameObjects.Text;
+  private menuRestartBtn!: Phaser.GameObjects.Text;
+  private normalPeekCount = 3;
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
@@ -104,6 +128,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   init(data: MatchSceneData): void {
+    this.sceneData = data;
     if (data.p1Color) this.p1Color = data.p1Color;
     if (data.p2Color) this.p2Color = data.p2Color;
     if (data.playerSlotCount) this.playerSlotCount = data.playerSlotCount;
@@ -117,11 +142,34 @@ export class MatchScene extends Phaser.Scene {
   create(): void {
     const { width } = this.scale;
 
+    this.menuState = createPlaytestMenuState({
+      hidingSpotCount: FARMYARD_LAYOUT.hidingSpots.length,
+    });
+    this.menuActive = false;
+
+    const applied = this.menuState.draft.applied;
+    this.normalPeekCount = applied.normalPeekCount;
+
     this.match = new Match({
+      durationMs: applied.matchDurationMs,
       spotCount: FARMYARD_LAYOUT.hidingSpots.length,
       spotPositions: FARMYARD_LAYOUT.hidingSpots,
       playerSlotCount: this.playerSlotCount,
       random: () => Math.random(),
+      peekPressureConfig: {
+        normalPeekCount: applied.normalPeekCount,
+        normalPeekDurationMs: applied.normalPeekDurationMs,
+        normalRefillMinMs: applied.normalRefillMinMs,
+        normalRefillMaxMs: applied.normalRefillMaxMs,
+        peekAnticipationDurationMs: applied.peekAnticipationDurationMs,
+        normalChickPoints: applied.normalChickPoints,
+      },
+      greenChickConfig: {
+        enabled: applied.greenChickEnabled,
+        points: applied.greenChickPoints,
+        scheduleMinMs: applied.greenChickScheduleMinMs,
+        scheduleMaxMs: applied.greenChickScheduleMaxMs,
+      },
     });
     this.presentationFeedback = new MatchPresentationFeedback({
       spotPositions: FARMYARD_LAYOUT.hidingSpots,
@@ -133,6 +181,10 @@ export class MatchScene extends Phaser.Scene {
         0: getPlayerChickenCssHex(this.p1Color),
         1: getPlayerChickenCssHex(this.p2Color),
       },
+      claimFeedbackDurationMs: applied.claimFeedbackDurationMs,
+      claimPopPeakScale: applied.claimPopPeakScale,
+      greenClaimBeatDurationMs: applied.greenClaimBeatDurationMs,
+      greenClaimBeatPeakScale: applied.greenClaimBeatPeakScale,
     });
     this.transitioned = false;
     this.chickBodies = [];
@@ -158,6 +210,9 @@ export class MatchScene extends Phaser.Scene {
     this.createOverlaps();
     this.drawBounds();
 
+    this.createPlaytestMenu();
+    this.createPlaytestKeybind();
+
     this.match.advance(0);
     this.feedbackCommands = this.presentationFeedback.update(
       [],
@@ -171,7 +226,11 @@ export class MatchScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     if (this.transitioned) return;
 
-    this.handleMovement();
+    if (this.menuActive) {
+      this.stopPlayerMovement();
+    } else {
+      this.handleMovement();
+    }
     const events = this.match.advance(delta);
     this.feedbackCommands = this.presentationFeedback.update(
       events,
@@ -446,7 +505,7 @@ export class MatchScene extends Phaser.Scene {
       createGraphics: () => this.add.graphics(),
     });
 
-    for (let i = 0; i < NORMAL_PEEK_COUNT; i++) {
+    for (let i = 0; i < this.normalPeekCount; i++) {
       const body = this.physics.add.sprite(
         0,
         0,
@@ -469,7 +528,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private createOverlaps(): void {
-    for (let slotIndex = 0; slotIndex < NORMAL_PEEK_COUNT; slotIndex++) {
+    for (let slotIndex = 0; slotIndex < this.normalPeekCount; slotIndex++) {
       const chickBody = this.chickBodies[slotIndex]!;
       this.physics.add.overlap(this.p1Chicken, chickBody, () =>
         this.handleClaim(0, slotIndex),
@@ -674,6 +733,377 @@ export class MatchScene extends Phaser.Scene {
     this.arrows = this.input.keyboard!.createCursorKeys();
   }
 
+  private createPlaytestKeybind(): void {
+    this.input.keyboard!.on("keydown", (event: KeyboardEvent) => {
+      if (event.key === "`" || event.key === "~") {
+        if (this.menuActive) {
+          this.menuState = closeMenu(this.menuState);
+        } else {
+          this.menuState = toggleMenu(this.menuState);
+          this.stopPlayerMovement();
+        }
+        this.menuActive = this.menuState.visible;
+        this.menuContainer.setVisible(this.menuActive);
+        this.renderPlaytestMenu();
+        return;
+      }
+      if (!this.menuActive) return;
+
+      if (event.key === "Escape") {
+        this.menuState = closeMenu(this.menuState);
+        this.menuActive = false;
+        this.menuContainer.setVisible(false);
+        return;
+      }
+
+      if (event.key === "Tab") {
+        event.preventDefault();
+        const nextIndex = this.menuState.activeFieldIndex + 1;
+        this.menuState = activateField(
+          this.menuState,
+          nextIndex >= FIELDS.length ? 0 : nextIndex,
+        );
+        this.renderPlaytestMenu();
+        return;
+      }
+
+      const current =
+        this.menuState.fieldValues[this.menuState.activeFieldIndex] ?? "";
+      let next: string | null = null;
+      if (event.key === "Backspace") {
+        next = current.slice(0, -1);
+      } else if (event.key.length === 1) {
+        next = current + event.key;
+      }
+      if (next !== null) {
+        this.menuState = updateFieldValue(this.menuState, next);
+        this.renderPlaytestMenu();
+      }
+    });
+  }
+
+  private createPlaytestMenu(): void {
+    const { width, height } = this.scale;
+    const panelW = 520;
+    const rowH = 30;
+    const rowGap = 2;
+    const sectionHeaderH = 16;
+    const titleAreaH = 36;
+    const legendH = 18;
+    const buttonAreaH = 60;
+
+    // Build section-aware Y positions
+    const fieldYs: number[] = [];
+    const sectionYs: number[] = [];
+    let cursorY = 0;
+    let currentSection = "";
+    for (let i = 0; i < FIELDS.length; i++) {
+      const section = FIELDS[i]!.section;
+      if (section !== currentSection) {
+        currentSection = section;
+        sectionYs.push(cursorY);
+        cursorY += sectionHeaderH;
+      }
+      fieldYs.push(cursorY);
+      cursorY += rowH + rowGap;
+    }
+    this.menuFieldYs = fieldYs;
+
+    const contentH = cursorY;
+    const panelH = titleAreaH + legendH + contentH + buttonAreaH;
+    const px = (width - panelW) / 2;
+    const py = (height - panelH) / 2;
+
+    this.menuFieldTexts = [];
+    this.menuFieldBgs = [];
+    this.menuErrorTexts = [];
+    this.menuSectionHeaders = [];
+
+    this.menuContainer = this.add.container(0, 0);
+    this.menuContainer.setDepth(100);
+    this.menuContainer.setVisible(false);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x111122, 0.92);
+    bg.fillRoundedRect(px, py, panelW, panelH, 12);
+    bg.lineStyle(2, 0x4488ff, 0.8);
+    bg.strokeRoundedRect(px, py, panelW, panelH, 12);
+    this.menuContainer.add(bg);
+
+    const title = this.add
+      .text(width / 2, py + 16, "Playtest Tuning", {
+        fontSize: "20px",
+        color: "#ffdd44",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+    this.menuContainer.add(title);
+
+    const legendText = this.add.text(
+      px + 14,
+      py + titleAreaH + 2,
+      "* = restart required",
+      {
+        fontSize: "11px",
+        color: "#ff8844",
+      },
+    );
+    this.menuContainer.add(legendText);
+
+    const inputW = 260;
+    const labelX = px + 14;
+    const inputX = px + panelW - 14 - inputW;
+
+    // Render section headers
+    let sectionIdx = 0;
+    currentSection = "";
+    for (let i = 0; i < FIELDS.length; i++) {
+      const field = FIELDS[i]!;
+      if (field.section !== currentSection) {
+        currentSection = field.section;
+        const secY = py + titleAreaH + legendH + sectionYs[sectionIdx]!;
+        const secText = this.add.text(labelX, secY, currentSection, {
+          fontSize: "12px",
+          color: "#aaccff",
+          fontStyle: "bold",
+        });
+        this.menuContainer.add(secText);
+        this.menuSectionHeaders.push(secText);
+        sectionIdx++;
+      }
+    }
+
+    // Render fields
+    for (let i = 0; i < FIELDS.length; i++) {
+      const field = FIELDS[i]!;
+      const rowY = py + titleAreaH + legendH + fieldYs[i]!;
+
+      const label = this.add.text(labelX, rowY, field.label, {
+        fontSize: "12px",
+        color: "#ccccdd",
+      });
+      this.menuContainer.add(label);
+
+      const unitHint = this.add.text(
+        inputX + inputW,
+        rowY + 14,
+        field.unitHint,
+        {
+          fontSize: "10px",
+          color: "#888899",
+        },
+      );
+      this.menuContainer.add(unitHint);
+
+      const fieldBg = this.add.graphics();
+      const borderColor =
+        i === this.menuState.activeFieldIndex ? 0x88bbff : 0x4488ff;
+      fieldBg.fillStyle(0x222244, 1);
+      fieldBg.fillRoundedRect(inputX, rowY - 1, inputW, 22, 3);
+      fieldBg.lineStyle(
+        1,
+        borderColor,
+        i === this.menuState.activeFieldIndex ? 0.9 : 0.5,
+      );
+      fieldBg.strokeRoundedRect(inputX, rowY - 1, inputW, 22, 3);
+      this.menuContainer.add(fieldBg);
+      this.menuFieldBgs[i] = fieldBg;
+
+      const fieldText = this.add.text(inputX + 4, rowY + 1, "", {
+        fontSize: "13px",
+        color: "#ffffff",
+      });
+      this.menuContainer.add(fieldText);
+      this.menuFieldTexts[i] = fieldText;
+
+      const errorText = this.add.text(inputX, rowY + 22, "", {
+        fontSize: "10px",
+        color: "#ff4444",
+      });
+      this.menuContainer.add(errorText);
+      this.menuErrorTexts[i] = errorText;
+
+      if (field.restartRequired) {
+        const restartReq = this.add
+          .text(px + panelW - 14, rowY, "*", {
+            fontSize: "12px",
+            color: "#ff8844",
+          })
+          .setOrigin(1, 0);
+        this.menuContainer.add(restartReq);
+      }
+    }
+
+    // Buttons
+    const btnStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontSize: "14px",
+      color: "#ffffff",
+      backgroundColor: "#334488",
+      padding: { x: 8, y: 5 },
+    };
+    const btnY = py + panelH - 50;
+    const btnGap = 6;
+
+    this.menuApplyBtn = this.add
+      .text(px + 14, btnY, "Apply", btnStyle)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onApply());
+    this.menuContainer.add(this.menuApplyBtn);
+
+    this.menuRestartBtn = this.add
+      .text(
+        this.menuApplyBtn.x + this.menuApplyBtn.width + btnGap,
+        btnY,
+        "Restart Match With Tuning",
+        btnStyle,
+      )
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onRestartMatch());
+    this.menuContainer.add(this.menuRestartBtn);
+
+    const resetBtn = this.add
+      .text(px + 14, btnY + 28, "Reset Draft", btnStyle)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onResetDraft());
+    this.menuContainer.add(resetBtn);
+
+    const defaultsBtn = this.add
+      .text(
+        resetBtn.x + resetBtn.width + btnGap,
+        btnY + 28,
+        "Defaults / Clear Saved",
+        btnStyle,
+      )
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onStageDefaults());
+    this.menuContainer.add(defaultsBtn);
+
+    const closeBtn = this.add
+      .text(px + panelW - 14, py + 10, "✕", {
+        fontSize: "16px",
+        color: "#888899",
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.onCloseMenu());
+    this.menuContainer.add(closeBtn);
+  }
+
+  private renderPlaytestMenu(): void {
+    const activeIndex = this.menuState.activeFieldIndex;
+    const hasErrors = this.menuState.errors.length > 0;
+
+    for (let i = 0; i < FIELDS.length; i++) {
+      const raw = this.menuState.fieldValues[i] ?? "";
+      const displayText = i === activeIndex ? raw + "█" : raw;
+      this.menuFieldTexts[i]?.setText(displayText);
+
+      const fieldErrors = this.menuState.errors.filter(
+        (e) => e.field === FIELDS[i]!.key,
+      );
+      const errMsg =
+        fieldErrors.length > 0
+          ? fieldErrors.map((e) => e.message).join("; ")
+          : "";
+      this.menuErrorTexts[i]?.setText(errMsg);
+
+      const bg = this.menuFieldBgs[i];
+      if (bg) {
+        bg.clear();
+        const { width, height } = this.scale;
+        const panelW = 520;
+        const rowH = 30;
+        const rowGap = 2;
+        const titleAreaH = 36;
+        const legendH = 18;
+        const buttonAreaH = 60;
+        const inputW = 260;
+        const px = (width - panelW) / 2;
+        const inputX = px + panelW - 14 - inputW;
+        const contentH =
+          this.menuFieldYs.length > 0
+            ? this.menuFieldYs[this.menuFieldYs.length - 1]! + rowH + rowGap
+            : 0;
+        const panelH = titleAreaH + legendH + contentH + buttonAreaH;
+        const py = (height - panelH) / 2;
+        const ry = py + titleAreaH + legendH + this.menuFieldYs[i]!;
+        const borderColor = i === activeIndex ? 0x88bbff : 0x4488ff;
+        bg.fillStyle(0x222244, 1);
+        bg.fillRoundedRect(inputX, ry - 1, inputW, 22, 3);
+        bg.lineStyle(1, borderColor, i === activeIndex ? 0.9 : 0.5);
+        bg.strokeRoundedRect(inputX, ry - 1, inputW, 22, 3);
+      }
+    }
+
+    // Visually disable Apply and Restart Match when errors exist
+    const btnAlpha = hasErrors ? 0.35 : 1;
+    this.menuApplyBtn.setAlpha(btnAlpha);
+    this.menuRestartBtn.setAlpha(btnAlpha);
+  }
+
+  private get claimFeedbackConfig() {
+    const a = this.menuState.draft.applied;
+    return {
+      claimFeedbackDurationMs: a.claimFeedbackDurationMs,
+      claimPopPeakScale: a.claimPopPeakScale,
+      greenClaimBeatDurationMs: a.greenClaimBeatDurationMs,
+      greenClaimBeatPeakScale: a.greenClaimBeatPeakScale,
+    };
+  }
+
+  private onApply(): void {
+    if (this.menuState.errors.length > 0) return;
+    this.menuState = applyTuning(this.menuState);
+    this.presentationFeedback.applyConfig(this.claimFeedbackConfig);
+    this.renderPlaytestMenu();
+  }
+
+  private onRestartMatch(): void {
+    if (this.menuState.errors.length > 0) return;
+    this.menuState = applyTuning(this.menuState);
+    this.scene.restart(this.sceneData);
+  }
+
+  private onResetDraft(): void {
+    this.menuState = resetDraftAction(this.menuState);
+    this.renderPlaytestMenu();
+  }
+
+  private onStageDefaults(): void {
+    this.menuState = stageDefaultsAction(this.menuState);
+    this.renderPlaytestMenu();
+  }
+
+  private onCloseMenu(): void {
+    this.menuState = closeMenu(this.menuState);
+    this.menuActive = false;
+    this.menuContainer.setVisible(false);
+  }
+
+  private get playerSpeed(): number {
+    return this.menuState.draft.applied.playerSpeed;
+  }
+
+  private get botSpeed(): number {
+    return this.menuState.draft.applied.botSpeed;
+  }
+
+  private get botIndecisionConfig(): BotChickenConfig {
+    const a = this.menuState.draft.applied;
+    return {
+      reactionDelayMinMs: a.reactionDelayMinMs,
+      reactionDelayMaxMs: a.reactionDelayMaxMs,
+      indecisionChance: a.indecisionChance,
+      indecisionDurationMs: a.indecisionDurationMs,
+      farTargetChance: a.farTargetChance,
+    };
+  }
+
+  private stopPlayerMovement(): void {
+    this.p1Chicken.setVelocity(0, 0);
+    this.p2Chicken.setVelocity(0, 0);
+  }
+
   private handleMovement(): void {
     const p1IsBot = this.botSlots.includes(0);
     if (!p1IsBot) {
@@ -684,7 +1114,7 @@ export class MatchScene extends Phaser.Scene {
           up: this.wasd.W.isDown,
           down: this.wasd.S.isDown,
         },
-        MOVE_SPEED,
+        this.playerSpeed,
       );
       this.p1Chicken.setVelocity(p1Velocity.vx, p1Velocity.vy);
     } else {
@@ -700,7 +1130,7 @@ export class MatchScene extends Phaser.Scene {
           up: this.arrows.up.isDown,
           down: this.arrows.down.isDown,
         },
-        MOVE_SPEED,
+        this.playerSpeed,
       );
       this.p2Chicken.setVelocity(p2Velocity.vx, p2Velocity.vy);
     } else {
@@ -721,8 +1151,9 @@ export class MatchScene extends Phaser.Scene {
     const result = tickBotChickenController(controller, {
       botPosition: { x: chicken.x, y: chicken.y },
       elapsedMs: this.match.view().elapsedMs,
-      speed: MOVE_SPEED,
+      speed: this.botSpeed,
       visibleTargets: this.getVisibleBotTargets(),
+      config: this.botIndecisionConfig,
     });
     this.botControllers.set(playerIndex, result.controller);
     chicken.setVelocity(result.velocity.vx, result.velocity.vy);
@@ -807,7 +1238,7 @@ export class MatchScene extends Phaser.Scene {
 
   private renderChicks(): void {
     const view = this.match.view();
-    for (let slotIndex = 0; slotIndex < NORMAL_PEEK_COUNT; slotIndex++) {
+    for (let slotIndex = 0; slotIndex < this.normalPeekCount; slotIndex++) {
       const body = this.chickBodies[slotIndex]!;
       const visibleChick = view.normalChicks.find(
         (chick) => chick.slotIndex === slotIndex,
@@ -852,7 +1283,8 @@ export class MatchScene extends Phaser.Scene {
         Math.sin((view.elapsedMs - anticipation.startedAtMs) / 60) * 2;
       const progress = Math.min(
         1,
-        (view.elapsedMs - anticipation.startedAtMs) / 700,
+        (view.elapsedMs - anticipation.startedAtMs) /
+          this.menuState.draft.applied.peekAnticipationDurationMs,
       );
       const radius = 18 * WORLD_SCALE + progress * 18 * WORLD_SCALE + wobble;
       const alpha = 0.75 * (1 - progress * 0.35);

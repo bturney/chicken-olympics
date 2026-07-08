@@ -85,6 +85,38 @@ export const GREEN_CHICK_POINTS = 5;
 export const GREEN_CHICK_SCHEDULE_MIN_MS = 20_000;
 export const GREEN_CHICK_SCHEDULE_MAX_MS = 70_000;
 
+export interface PeekPressureConfig {
+  normalPeekCount: number;
+  normalPeekDurationMs: number;
+  normalRefillMinMs: number;
+  normalRefillMaxMs: number;
+  peekAnticipationDurationMs: number;
+  normalChickPoints: number;
+}
+
+export const DEFAULT_PEEK_PRESSURE_CONFIG: PeekPressureConfig = {
+  normalPeekCount: NORMAL_PEEK_COUNT,
+  normalPeekDurationMs: NORMAL_PEEK_DURATION_MS,
+  normalRefillMinMs: NORMAL_REFILL_MIN_MS,
+  normalRefillMaxMs: NORMAL_REFILL_MAX_MS,
+  peekAnticipationDurationMs: PEEK_ANTICIPATION_DURATION_MS,
+  normalChickPoints: NORMAL_CHICK_POINTS,
+};
+
+export interface GreenChickConfig {
+  enabled: boolean;
+  points: number;
+  scheduleMinMs: number;
+  scheduleMaxMs: number;
+}
+
+export const DEFAULT_GREEN_CHICK_CONFIG: GreenChickConfig = {
+  enabled: true,
+  points: GREEN_CHICK_POINTS,
+  scheduleMinMs: GREEN_CHICK_SCHEDULE_MIN_MS,
+  scheduleMaxMs: GREEN_CHICK_SCHEDULE_MAX_MS,
+};
+
 export type GreenChickStatus =
   "pending" | "waiting" | "active" | "claimed" | "missed";
 
@@ -100,18 +132,18 @@ export interface GreenChickState {
 export function createGreenChickState(
   matchDurationMs: number,
   random: () => number,
+  config: GreenChickConfig = DEFAULT_GREEN_CHICK_CONFIG,
 ): GreenChickState {
-  const range = GREEN_CHICK_SCHEDULE_MAX_MS - GREEN_CHICK_SCHEDULE_MIN_MS;
+  const range = config.scheduleMaxMs - config.scheduleMinMs;
   const scaledRange = Math.floor(
     (range * matchDurationMs) / PRODUCTION_MATCH_DURATION_MS,
   );
   const scheduledAtMs =
     Math.floor(
-      (GREEN_CHICK_SCHEDULE_MIN_MS * matchDurationMs) /
-        PRODUCTION_MATCH_DURATION_MS,
+      (config.scheduleMinMs * matchDurationMs) / PRODUCTION_MATCH_DURATION_MS,
     ) + Math.floor(random() * scaledRange);
   return {
-    status: "pending",
+    status: config.enabled ? "pending" : "missed",
     scheduledAtMs,
     activeSpotIndex: null,
     peekStartedAtMs: null,
@@ -127,12 +159,13 @@ function selectFreeSpotForGreenChick(
   spotCount: number,
   randomValue: number,
   spotPositions?: readonly SpotPosition[],
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): number | null {
   return createArena({
     spotCount,
     spotPositions,
     occupiedSpotIndices: [
-      ...getOccupiedNormalSpotIndices(peekState, currentTimeMs),
+      ...getOccupiedNormalSpotIndices(peekState, currentTimeMs, config),
       ...(greenChickState.activeSpotIndex === null
         ? []
         : [greenChickState.activeSpotIndex]),
@@ -145,6 +178,7 @@ function selectFreeSpotForGreenChick(
 export function isGreenChickPeekActive(
   greenChickState: GreenChickState,
   currentTimeMs: number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): boolean {
   if (
     greenChickState.status !== "active" ||
@@ -153,15 +187,17 @@ export function isGreenChickPeekActive(
     return false;
   }
   return (
-    currentTimeMs - greenChickState.peekStartedAtMs < NORMAL_PEEK_DURATION_MS
+    currentTimeMs - greenChickState.peekStartedAtMs <
+    config.normalPeekDurationMs
   );
 }
 
 export function getActiveGreenChickSpotIndex(
   greenChickState: GreenChickState,
   currentTimeMs: number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): number | null {
-  if (!isGreenChickPeekActive(greenChickState, currentTimeMs)) {
+  if (!isGreenChickPeekActive(greenChickState, currentTimeMs, config)) {
     return null;
   }
   return greenChickState.activeSpotIndex;
@@ -174,6 +210,7 @@ export function tickGreenChickState(
   spotCount: number,
   random: () => number,
   spotPositions?: readonly SpotPosition[],
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): GreenChickState {
   if (greenChickState.status === "claimed") {
     return greenChickState;
@@ -186,7 +223,8 @@ export function tickGreenChickState(
   if (
     greenChickState.status === "active" &&
     greenChickState.peekStartedAtMs !== null &&
-    currentTimeMs - greenChickState.peekStartedAtMs >= NORMAL_PEEK_DURATION_MS
+    currentTimeMs - greenChickState.peekStartedAtMs >=
+      config.normalPeekDurationMs
   ) {
     return {
       ...greenChickState,
@@ -213,6 +251,7 @@ export function tickGreenChickState(
     spotCount,
     random(),
     spotPositions,
+    config,
   );
 
   if (spot === null) {
@@ -241,15 +280,17 @@ export function attemptGreenChickClaim(
   spotIndex: number,
   playerIndex: PlayerIndex,
   currentTimeMs: number,
+  peekConfig: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
+  greenConfig: GreenChickConfig = DEFAULT_GREEN_CHICK_CONFIG,
 ): GreenChickClaimResult {
   if (
-    !isGreenChickPeekActive(greenChickState, currentTimeMs) ||
+    !isGreenChickPeekActive(greenChickState, currentTimeMs, peekConfig) ||
     greenChickState.activeSpotIndex !== spotIndex
   ) {
     return { matchState, greenChickState, claimed: false };
   }
   return {
-    matchState: addScore(matchState, playerIndex, GREEN_CHICK_POINTS),
+    matchState: addScore(matchState, playerIndex, greenConfig.points),
     greenChickState: {
       ...greenChickState,
       status: "claimed",
@@ -277,9 +318,12 @@ export interface PeekState {
 
 const RECENT_SPOT_MEMORY = 2;
 
-export function createPeekState(now: number = 0): PeekState {
+export function createPeekState(
+  now: number = 0,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
+): PeekState {
   return {
-    peeks: Array.from({ length: NORMAL_PEEK_COUNT }, () => ({
+    peeks: Array.from({ length: config.normalPeekCount }, () => ({
       activeSpotIndex: null,
       peekStartedAtMs: null,
       nextRefillAtMs: now,
@@ -309,27 +353,36 @@ function isPeekAnticipating(peek: NormalPeek, currentTimeMs: number): boolean {
   );
 }
 
-export function isPeekActive(peek: NormalPeek, currentTimeMs: number): boolean {
+export function isPeekActive(
+  peek: NormalPeek,
+  currentTimeMs: number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
+): boolean {
   if (peek.activeSpotIndex === null || peek.peekStartedAtMs === null) {
     return false;
   }
-  return currentTimeMs - peek.peekStartedAtMs < NORMAL_PEEK_DURATION_MS;
+  return currentTimeMs - peek.peekStartedAtMs < config.normalPeekDurationMs;
 }
 
 export function getActiveNormalSpotIndices(
   peekState: PeekState,
   currentTimeMs: number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): readonly number[] {
-  return getOccupiedNormalSpotIndices(peekState, currentTimeMs);
+  return getOccupiedNormalSpotIndices(peekState, currentTimeMs, config);
 }
 
 function getOccupiedNormalSpotIndices(
   peekState: PeekState,
   currentTimeMs: number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): readonly number[] {
   const out: number[] = [];
   for (const peek of peekState.peeks) {
-    if (isPeekActive(peek, currentTimeMs) && peek.activeSpotIndex !== null) {
+    if (
+      isPeekActive(peek, currentTimeMs, config) &&
+      peek.activeSpotIndex !== null
+    ) {
       out.push(peek.activeSpotIndex);
     }
   }
@@ -352,11 +405,14 @@ function getReservedNormalSpotIndices(
   return [...out];
 }
 
-export function computeRefillDelayMs(randomValue: number): number {
+export function computeRefillDelayMs(
+  randomValue: number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
+): number {
   const clamped = Math.max(0, Math.min(1, randomValue));
   return (
-    NORMAL_REFILL_MIN_MS +
-    clamped * (NORMAL_REFILL_MAX_MS - NORMAL_REFILL_MIN_MS)
+    config.normalRefillMinMs +
+    clamped * (config.normalRefillMaxMs - config.normalRefillMinMs)
   );
 }
 
@@ -366,11 +422,16 @@ export function selectFreeSpotIndex(
   spotCount: number,
   randomValue: number,
   spotPositions?: readonly SpotPosition[],
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): number | null {
   return createArena({
     spotCount,
     spotPositions,
-    occupiedSpotIndices: getOccupiedNormalSpotIndices(peekState, currentTimeMs),
+    occupiedSpotIndices: getOccupiedNormalSpotIndices(
+      peekState,
+      currentTimeMs,
+      config,
+    ),
     reservedSpotIndices: getReservedNormalSpotIndices(peekState, currentTimeMs),
     recentSpotIndices: peekState.recentSpotIndices,
   }).allocateSpot(randomValue);
@@ -419,11 +480,12 @@ function expireSlot(
   peek: NormalPeek,
   currentTimeMs: number,
   random: () => number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): NormalPeek {
   return {
     activeSpotIndex: null,
     peekStartedAtMs: null,
-    nextRefillAtMs: currentTimeMs + computeRefillDelayMs(random()),
+    nextRefillAtMs: currentTimeMs + computeRefillDelayMs(random(), config),
     anticipationStartedAtMs: null,
     anticipatedSpotIndex: null,
   };
@@ -435,6 +497,7 @@ export function tickPeekState(
   spotCount: number,
   random: () => number,
   spotPositions?: readonly SpotPosition[],
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): PeekState {
   const peeks: NormalPeek[] = [];
   let workingState = peekState;
@@ -446,8 +509,8 @@ export function tickPeekState(
   };
   for (const peek of peekState.peeks) {
     if (peek.activeSpotIndex !== null && peek.peekStartedAtMs !== null) {
-      if (currentTimeMs - peek.peekStartedAtMs >= NORMAL_PEEK_DURATION_MS) {
-        const expired = expireSlot(peek, currentTimeMs, random);
+      if (currentTimeMs - peek.peekStartedAtMs >= config.normalPeekDurationMs) {
+        const expired = expireSlot(peek, currentTimeMs, random, config);
         peeks.push(expired);
         syncWorkingPeeks();
         workingState = rememberSpot(workingState, peek.activeSpotIndex);
@@ -479,7 +542,7 @@ export function tickPeekState(
 
     if (
       peek.nextRefillAtMs !== null &&
-      currentTimeMs >= peek.nextRefillAtMs - PEEK_ANTICIPATION_DURATION_MS
+      currentTimeMs >= peek.nextRefillAtMs - config.peekAnticipationDurationMs
     ) {
       const spot = selectFreeSpotIndex(
         workingState,
@@ -487,6 +550,7 @@ export function tickPeekState(
         spotCount,
         random(),
         spotPositions,
+        config,
       );
       if (spot === null) {
         peeks.push(peek);
@@ -560,19 +624,21 @@ export function attemptClaim(
   playerIndex: PlayerIndex,
   currentTimeMs: number,
   random: () => number,
+  config: PeekPressureConfig = DEFAULT_PEEK_PRESSURE_CONFIG,
 ): ClaimResult {
   const slotIndex = peekState.peeks.findIndex(
-    (p) => p.activeSpotIndex === spotIndex && isPeekActive(p, currentTimeMs),
+    (p) =>
+      p.activeSpotIndex === spotIndex && isPeekActive(p, currentTimeMs, config),
   );
   if (slotIndex === -1) {
     return { matchState, peekState, claimed: false };
   }
   const claimed = peekState.peeks[slotIndex]!;
   const newPeeks = peekState.peeks.map((p, i) =>
-    i === slotIndex ? expireSlot(claimed, currentTimeMs, random) : p,
+    i === slotIndex ? expireSlot(claimed, currentTimeMs, random, config) : p,
   );
   return {
-    matchState: addScore(matchState, playerIndex, NORMAL_CHICK_POINTS),
+    matchState: addScore(matchState, playerIndex, config.normalChickPoints),
     peekState: rememberSpot({ ...peekState, peeks: newPeeks }, spotIndex),
     claimed: true,
   };

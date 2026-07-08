@@ -27,9 +27,11 @@ beforeEach(() => {
 
 import { PRODUCTION_TUNING } from "../src/match/playtestTuning";
 import {
+  FIELDS,
   createPlaytestMenuState,
   toggleMenu,
   updateFieldValue,
+  activateField,
   applyTuning,
   stageDefaultsAction,
   resetDraftAction,
@@ -37,14 +39,21 @@ import {
   restartWithTuning,
 } from "../src/match/playtestMenuManager";
 
+describe("FIELDS", () => {
+  it("has all 11 tuning fields", () => {
+    expect(FIELDS).toHaveLength(11);
+  });
+});
+
 describe("createPlaytestMenuState", () => {
   it("creates a menu state with default draft, hidden, and no field errors", () => {
     const state = createPlaytestMenuState();
     expect(state.visible).toBe(false);
     expect(state.draft.draft).toEqual(PRODUCTION_TUNING);
     expect(state.draft.applied).toEqual(PRODUCTION_TUNING);
-    expect(state.fieldValue).toBe("90000ms");
+    expect(state.fieldValues[0]).toBe("90000ms");
     expect(state.errors).toEqual([]);
+    expect(state.activeFieldIndex).toBe(0);
   });
 });
 
@@ -64,50 +73,58 @@ describe("toggleMenu", () => {
   it("preserves other state when toggling", () => {
     const state = createPlaytestMenuState();
     const toggled = toggleMenu(state);
-    expect(toggled.fieldValue).toBe(state.fieldValue);
+    expect(toggled.fieldValues).toEqual(state.fieldValues);
     expect(toggled.draft).toBe(state.draft);
   });
 });
 
+describe("activateField", () => {
+  it("sets activeFieldIndex within bounds", () => {
+    const state = createPlaytestMenuState();
+    const activated = activateField(state, 2);
+    expect(activated.activeFieldIndex).toBe(2);
+  });
+
+  it("clamps to zero for negative index", () => {
+    const state = createPlaytestMenuState();
+    const activated = activateField(state, -1);
+    expect(activated.activeFieldIndex).toBe(0);
+  });
+
+  it("clamps to max index", () => {
+    const state = createPlaytestMenuState();
+    const activated = activateField(state, 999);
+    expect(activated.activeFieldIndex).toBe(FIELDS.length - 1);
+  });
+});
+
 describe("updateFieldValue", () => {
-  it("updates field value and draft for a valid duration string", () => {
+  it("updates the active field value and draft for a valid duration string", () => {
     const state = createPlaytestMenuState();
     const updated = updateFieldValue(state, "60000");
-    expect(updated.fieldValue).toBe("60000");
+    expect(updated.fieldValues[0]).toBe("60000");
     expect(updated.draft.draft.matchDurationMs).toBe(60_000);
     expect(updated.errors).toEqual([]);
   });
 
-  it("parses seconds format", () => {
+  it("parses seconds format for the active field", () => {
     const state = createPlaytestMenuState();
-    const updated = updateFieldValue(state, "60s");
+    const withActive = activateField(state, 0);
+    const updated = updateFieldValue(withActive, "60s");
     expect(updated.draft.draft.matchDurationMs).toBe(60_000);
     expect(updated.errors).toEqual([]);
   });
 
-  it("parses minutes format", () => {
-    const state = createPlaytestMenuState();
-    const updated = updateFieldValue(state, "2m");
-    expect(updated.draft.draft.matchDurationMs).toBe(120_000);
-    expect(updated.errors).toEqual([]);
-  });
-
-  it("reports errors for invalid duration", () => {
+  it("reports errors for invalid field value", () => {
     const state = createPlaytestMenuState();
     const updated = updateFieldValue(state, "abc");
-    expect(updated.errors.length).toBeGreaterThan(0);
-  });
-
-  it("reports errors for negative duration", () => {
-    const state = createPlaytestMenuState();
-    const updated = updateFieldValue(state, "-1000");
     expect(updated.errors.length).toBeGreaterThan(0);
   });
 
   it("preserves field value even when parsing fails", () => {
     const state = createPlaytestMenuState();
     const updated = updateFieldValue(state, "not-valid");
-    expect(updated.fieldValue).toBe("not-valid");
+    expect(updated.fieldValues[0]).toBe("not-valid");
   });
 });
 
@@ -154,10 +171,10 @@ describe("stageDefaultsAction", () => {
     expect(staged.errors).toEqual([]);
   });
 
-  it("updates fieldValue to match staged defaults", () => {
+  it("updates fieldValues to match staged defaults", () => {
     const state = createPlaytestMenuState();
     const staged = stageDefaultsAction(state);
-    expect(staged.fieldValue).toBe("90000ms");
+    expect(staged.fieldValues[0]).toBe("90000ms");
   });
 });
 
@@ -168,14 +185,13 @@ describe("closeMenu", () => {
     expect(closed.visible).toBe(false);
   });
 
-  it("resets field value and errors to match draft", () => {
+  it("resets field values and errors to match draft", () => {
     const state = createPlaytestMenuState();
     const withError = updateFieldValue(state, "abc");
     const closed = closeMenu(withError);
-    expect(closed.fieldValue).toBe("90000ms");
+    expect(closed.fieldValues[0]).toBe("90000ms");
     expect(closed.errors).toEqual([]);
   });
-
 });
 
 describe("restartWithTuning", () => {

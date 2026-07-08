@@ -29,6 +29,8 @@ import {
   PRODUCTION_TUNING,
   createTuningDraft,
   parseDurationMs,
+  parseCount,
+  parseBoolean,
   formatDurationMs,
   validateTuning,
   commitDraft,
@@ -36,15 +38,85 @@ import {
   loadTuning,
   clearTuning,
   isDefaultTuning,
+  cloneTuning,
   type PlaytestTuning,
   type TuningDraft,
 } from "../src/match/playtestTuning";
 
 const STORAGE_KEY = "chicken-olympics-playtest-tuning";
 
+function fullTuning(overrides?: Partial<PlaytestTuning>): PlaytestTuning {
+  return { ...PRODUCTION_TUNING, ...overrides };
+}
+
 describe("PRODUCTION_TUNING", () => {
   it("defaults match duration to 90 seconds", () => {
     expect(PRODUCTION_TUNING.matchDurationMs).toBe(90_000);
+  });
+
+  it("defaults normal peek count to 3", () => {
+    expect(PRODUCTION_TUNING.normalPeekCount).toBe(3);
+  });
+
+  it("defaults green chick enabled to true", () => {
+    expect(PRODUCTION_TUNING.greenChickEnabled).toBe(true);
+  });
+});
+
+describe("parseCount", () => {
+  it("parses a positive whole number", () => {
+    expect(parseCount("5")).toBe(5);
+  });
+
+  it("rejects zero", () => {
+    expect(parseCount("0")).toBeNull();
+  });
+
+  it("rejects negative numbers", () => {
+    expect(parseCount("-3")).toBeNull();
+  });
+
+  it("rejects non-numeric input", () => {
+    expect(parseCount("abc")).toBeNull();
+  });
+
+  it("rejects decimals", () => {
+    expect(parseCount("3.5")).toBeNull();
+  });
+});
+
+describe("parseBoolean", () => {
+  it("parses 'true' as true", () => {
+    expect(parseBoolean("true")).toBe(true);
+  });
+
+  it("parses 'false' as false", () => {
+    expect(parseBoolean("false")).toBe(false);
+  });
+
+  it("parses '1' as true", () => {
+    expect(parseBoolean("1")).toBe(true);
+  });
+
+  it("parses '0' as false", () => {
+    expect(parseBoolean("0")).toBe(false);
+  });
+
+  it("parses 'yes' as true", () => {
+    expect(parseBoolean("yes")).toBe(true);
+  });
+
+  it("parses 'no' as false", () => {
+    expect(parseBoolean("no")).toBe(false);
+  });
+
+  it("rejects invalid input", () => {
+    expect(parseBoolean("maybe")).toBeNull();
+  });
+
+  it("is case-insensitive", () => {
+    expect(parseBoolean("TRUE")).toBe(true);
+    expect(parseBoolean("False")).toBe(false);
   });
 });
 
@@ -102,6 +174,15 @@ describe("formatDurationMs", () => {
   });
 });
 
+describe("cloneTuning", () => {
+  it("creates an independent copy", () => {
+    const copy = cloneTuning(PRODUCTION_TUNING);
+    expect(copy).toEqual(PRODUCTION_TUNING);
+    copy.matchDurationMs = 999;
+    expect(PRODUCTION_TUNING.matchDurationMs).toBe(90_000);
+  });
+});
+
 describe("createTuningDraft", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -114,7 +195,7 @@ describe("createTuningDraft", () => {
   });
 
   it("creates a draft from saved tuning when it exists", () => {
-    const saved: PlaytestTuning = { matchDurationMs: 180_000 };
+    const saved = fullTuning({ matchDurationMs: 180_000 });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     const draft = createTuningDraft();
     expect(draft.draft).toEqual(saved);
@@ -162,29 +243,54 @@ describe("validateTuning", () => {
 
   it("passes for a valid tuned value", () => {
     expect(
-      validateTuning({ matchDurationMs: 180_000 }),
+      validateTuning(fullTuning({ matchDurationMs: 180_000 })),
     ).toEqual([]);
   });
 
   it("rejects negative match duration", () => {
-    const errors = validateTuning({ matchDurationMs: -1000 });
+    const errors = validateTuning(fullTuning({ matchDurationMs: -1000 }));
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]!.field).toBe("matchDurationMs");
   });
 
   it("rejects zero match duration", () => {
-    const errors = validateTuning({ matchDurationMs: 0 });
+    const errors = validateTuning(fullTuning({ matchDurationMs: 0 }));
     expect(errors.length).toBeGreaterThan(0);
   });
 
   it("rejects NaN match duration", () => {
-    const errors = validateTuning({ matchDurationMs: Number.NaN });
+    const errors = validateTuning(fullTuning({ matchDurationMs: Number.NaN }));
     expect(errors.length).toBeGreaterThan(0);
   });
 
   it("rejects Infinity match duration", () => {
-    const errors = validateTuning({ matchDurationMs: Number.POSITIVE_INFINITY });
+    const errors = validateTuning(fullTuning({ matchDurationMs: Number.POSITIVE_INFINITY }));
     expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it("rejects refill min >= refill max", () => {
+    const errors = validateTuning(fullTuning({ normalRefillMinMs: 2000, normalRefillMaxMs: 1000 }));
+    expect(errors.some((e) => e.field === "normalRefillMaxMs")).toBe(true);
+  });
+
+  it("rejects green chick schedule min >= max", () => {
+    const errors = validateTuning(fullTuning({ greenChickScheduleMinMs: 50000, greenChickScheduleMaxMs: 30000 }));
+    expect(errors.some((e) => e.field === "greenChickScheduleMaxMs")).toBe(true);
+  });
+
+  it("rejects non-integer normalPeekCount", () => {
+    const errors = validateTuning(fullTuning({ normalPeekCount: 2.5 }));
+    expect(errors.some((e) => e.field === "normalPeekCount")).toBe(true);
+  });
+
+  it("rejects negative peek duration", () => {
+    const errors = validateTuning(fullTuning({ normalPeekDurationMs: -100 }));
+    expect(errors.some((e) => e.field === "normalPeekDurationMs")).toBe(true);
+  });
+
+  it("rejects non-boolean greenChickEnabled", () => {
+    const errors = validateTuning(fullTuning({ greenChickEnabled: "yes" as unknown as boolean }));
+    expect(errors.some((e) => e.field === "greenChickEnabled")).toBe(true);
   });
 });
 
@@ -196,11 +302,11 @@ describe("commitDraft", () => {
   it("applies the draft as the new applied state", () => {
     const draft = createTuningDraft();
     const modified: TuningDraft = {
-      draft: { matchDurationMs: 180_000 },
+      draft: fullTuning({ matchDurationMs: 180_000 }),
       applied: draft.applied,
     };
     const result = commitDraft(modified);
-    expect(result.applied).toEqual({ matchDurationMs: 180_000 });
+    expect(result.applied.matchDurationMs).toBe(180_000);
   });
 
   it("copies draft to applied on commit", () => {
@@ -215,13 +321,14 @@ describe("commitDraft", () => {
     draft.draft.matchDurationMs = 300_000;
     commitDraft(draft);
     const loaded = loadTuning();
-    expect(loaded).toEqual({ matchDurationMs: 300_000 });
+    expect(loaded!.matchDurationMs).toBe(300_000);
   });
 
   it("clears localStorage when committed tuning equals production defaults", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ matchDurationMs: 300_000 }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fullTuning({ matchDurationMs: 300_000 })));
     const draft = createTuningDraft();
     draft.draft.matchDurationMs = PRODUCTION_TUNING.matchDurationMs;
+    draft.draft.normalPeekCount = PRODUCTION_TUNING.normalPeekCount;
     commitDraft(draft);
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
@@ -241,7 +348,7 @@ describe("stageDefaults", () => {
   });
 
   it("does not clear localStorage", () => {
-    const saved: PlaytestTuning = { matchDurationMs: 300_000 };
+    const saved = fullTuning({ matchDurationMs: 300_000 });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     const draft = createTuningDraft();
     stageDefaults(draft);
@@ -259,13 +366,13 @@ describe("loadTuning / clearTuning", () => {
   });
 
   it("loads saved tuning", () => {
-    const saved: PlaytestTuning = { matchDurationMs: 120_000 };
+    const saved = fullTuning({ matchDurationMs: 120_000 });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     expect(loadTuning()).toEqual(saved);
   });
 
   it("clears saved tuning", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ matchDurationMs: 120_000 }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fullTuning({ matchDurationMs: 120_000 })));
     clearTuning();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
@@ -279,6 +386,16 @@ describe("loadTuning / clearTuning", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify("string"));
     expect(loadTuning()).toBeNull();
   });
+
+  it("loads partial saved data with fallback defaults for missing fields", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ matchDurationMs: 120_000 }),
+    );
+    const loaded = loadTuning();
+    expect(loaded!.matchDurationMs).toBe(120_000);
+    expect(loaded!.normalPeekCount).toBe(PRODUCTION_TUNING.normalPeekCount);
+  });
 });
 
 describe("isDefaultTuning", () => {
@@ -286,8 +403,16 @@ describe("isDefaultTuning", () => {
     expect(isDefaultTuning(PRODUCTION_TUNING)).toBe(true);
   });
 
-  it("returns false for a non-default value", () => {
-    expect(isDefaultTuning({ matchDurationMs: 180_000 })).toBe(false);
+  it("returns false for a non-default match duration", () => {
+    expect(isDefaultTuning(fullTuning({ matchDurationMs: 180_000 }))).toBe(false);
+  });
+
+  it("returns false for a non-default peek count", () => {
+    expect(isDefaultTuning(fullTuning({ normalPeekCount: 5 }))).toBe(false);
+  });
+
+  it("returns false for a non-default green chick state", () => {
+    expect(isDefaultTuning(fullTuning({ greenChickEnabled: false }))).toBe(false);
   });
 });
 
@@ -310,5 +435,76 @@ describe("Match with tuned duration", () => {
     expect(match.view().remainingMs).toBe(15_000);
     match.advance(15_000);
     expect(match.view().complete).toBe(true);
+  });
+});
+
+describe("Match with tuned Peek Pressure", () => {
+  it("uses tuned normalPeekCount to control the number of simultaneous normal chicks", () => {
+    const match = new Match({
+      durationMs: 10_000,
+      spotCount: 10,
+      random: () => 0,
+      peekPressureConfig: { normalPeekCount: 1 },
+    });
+    match.advance(0);
+    expect(match.view().normalChicks).toHaveLength(1);
+  });
+
+  it("uses tuned normalPeekDurationMs to control how long chicks stay visible", () => {
+    const match = new Match({
+      durationMs: 10_000,
+      spotCount: 10,
+      random: () => 0,
+      peekPressureConfig: {
+        normalPeekDurationMs: 100,
+        normalRefillMinMs: 10_000,
+        normalRefillMaxMs: 10_000,
+      },
+    });
+    match.advance(0);
+    expect(match.view().normalChicks).toHaveLength(3);
+    match.advance(200);
+    expect(match.view().normalChicks).toHaveLength(0);
+  });
+});
+
+describe("Match with tuned Green Chick", () => {
+  it("does not spawn a green chick when greenChickEnabled is false", () => {
+    const match = new Match({
+      durationMs: 10_000,
+      spotCount: 6,
+      random: () => 0,
+      greenChickConfig: { enabled: false },
+    });
+    match.advance(10_000);
+    expect(match.view().greenChick).toBeNull();
+  });
+
+  it("uses tuned greenChickPoints for scoring", () => {
+    const match = new Match({
+      durationMs: 9_000,
+      spotCount: 6,
+      random: () => 0,
+      greenChickConfig: { points: 10 },
+    });
+    match.advance(0);
+    match.advance(2_000);
+    const greenSpot = match.view().greenChick?.spotIndex ?? 0;
+    match.claim(greenSpot, 0);
+    expect(match.view().scores).toEqual([10, 0]);
+  });
+
+  it("uses tuned schedule to control green chick appearance timing", () => {
+    const match = new Match({
+      durationMs: 100_000,
+      spotCount: 6,
+      random: () => 0,
+      greenChickConfig: { scheduleMinMs: 1_000, scheduleMaxMs: 1_000 },
+    });
+    match.advance(0);
+    expect(match.view().greenChick).toBeNull();
+    // schedule is scaled: 1000 * 100000 / 90000 ≈ 1111ms
+    match.advance(1_200);
+    expect(match.view().greenChick).not.toBeNull();
   });
 });

@@ -1,15 +1,16 @@
 import Phaser from "phaser";
 import {
-  NORMAL_PEEK_COUNT,
   type PlayerSlotCount,
 } from "../match/rules";
 import { Match } from "../match/match";
 import { FARMYARD_LAYOUT, WORLD_SCALE } from "../match/layout";
 import {
+  FIELDS,
   type PlaytestMenuState,
   createPlaytestMenuState,
   toggleMenu,
   updateFieldValue,
+  activateField,
   applyTuning,
   resetDraftAction,
   stageDefaultsAction,
@@ -92,8 +93,10 @@ export class MatchScene extends Phaser.Scene {
   private menuContainer!: Phaser.GameObjects.Container;
   private menuActive = false;
   private sceneData!: MatchSceneData;
-  private menuFieldText!: Phaser.GameObjects.Text;
-  private menuErrorText!: Phaser.GameObjects.Text;
+  private menuFieldTexts: Phaser.GameObjects.Text[] = [];
+  private menuFieldBgs: Phaser.GameObjects.Graphics[] = [];
+  private menuErrorTexts: Phaser.GameObjects.Text[] = [];
+  private normalPeekCount = 3;
 
   private p1Chicken!: Phaser.Physics.Arcade.Sprite;
   private p2Chicken!: Phaser.Physics.Arcade.Sprite;
@@ -139,12 +142,29 @@ export class MatchScene extends Phaser.Scene {
     this.menuState = createPlaytestMenuState();
     this.menuActive = false;
 
+    const applied = this.menuState.draft.applied;
+    this.normalPeekCount = applied.normalPeekCount;
+
     this.match = new Match({
-      durationMs: this.menuState.draft.applied.matchDurationMs,
+      durationMs: applied.matchDurationMs,
       spotCount: FARMYARD_LAYOUT.hidingSpots.length,
       spotPositions: FARMYARD_LAYOUT.hidingSpots,
       playerSlotCount: this.playerSlotCount,
       random: () => Math.random(),
+      peekPressureConfig: {
+        normalPeekCount: applied.normalPeekCount,
+        normalPeekDurationMs: applied.normalPeekDurationMs,
+        normalRefillMinMs: applied.normalRefillMinMs,
+        normalRefillMaxMs: applied.normalRefillMaxMs,
+        peekAnticipationDurationMs: applied.peekAnticipationDurationMs,
+        normalChickPoints: applied.normalChickPoints,
+      },
+      greenChickConfig: {
+        enabled: applied.greenChickEnabled,
+        points: applied.greenChickPoints,
+        scheduleMinMs: applied.greenChickScheduleMinMs,
+        scheduleMaxMs: applied.greenChickScheduleMaxMs,
+      },
     });
     this.presentationFeedback = new MatchPresentationFeedback({
       spotPositions: FARMYARD_LAYOUT.hidingSpots,
@@ -474,7 +494,7 @@ export class MatchScene extends Phaser.Scene {
       createGraphics: () => this.add.graphics(),
     });
 
-    for (let i = 0; i < NORMAL_PEEK_COUNT; i++) {
+    for (let i = 0; i < this.normalPeekCount; i++) {
       const body = this.physics.add.sprite(
         0,
         0,
@@ -497,7 +517,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private createOverlaps(): void {
-    for (let slotIndex = 0; slotIndex < NORMAL_PEEK_COUNT; slotIndex++) {
+    for (let slotIndex = 0; slotIndex < this.normalPeekCount; slotIndex++) {
       const chickBody = this.chickBodies[slotIndex]!;
       this.physics.add.overlap(this.p1Chicken, chickBody, () =>
         this.handleClaim(0, slotIndex),
@@ -724,14 +744,22 @@ export class MatchScene extends Phaser.Scene {
         return;
       }
 
-      const current = this.menuState.fieldValue;
+      if (event.key === "Tab") {
+        event.preventDefault();
+        const nextIndex = this.menuState.activeFieldIndex + 1;
+        this.menuState = activateField(
+          this.menuState,
+          nextIndex >= FIELDS.length ? 0 : nextIndex,
+        );
+        this.renderPlaytestMenu();
+        return;
+      }
+
+      const current = this.menuState.fieldValues[this.menuState.activeFieldIndex] ?? "";
       let next: string | null = null;
       if (event.key === "Backspace") {
         next = current.slice(0, -1);
-      } else if (
-        event.key.length === 1 &&
-        /[\d.sm]/.test(event.key)
-      ) {
+      } else if (event.key.length === 1) {
         next = current + event.key;
       }
       if (next !== null) {
@@ -743,10 +771,18 @@ export class MatchScene extends Phaser.Scene {
 
   private createPlaytestMenu(): void {
     const { width, height } = this.scale;
-    const panelW = 480;
-    const panelH = 360;
+    const panelW = 520;
+    const rowH = 30;
+    const rowGap = 2;
+    const fieldRows = FIELDS.length;
+    const fieldsH = fieldRows * (rowH + rowGap);
+    const panelH = 36 + fieldsH + 60;
     const px = (width - panelW) / 2;
     const py = (height - panelH) / 2;
+
+    this.menuFieldTexts = [];
+    this.menuFieldBgs = [];
+    this.menuErrorTexts = [];
 
     this.menuContainer = this.add.container(0, 0);
     this.menuContainer.setDepth(100);
@@ -760,72 +796,81 @@ export class MatchScene extends Phaser.Scene {
     this.menuContainer.add(bg);
 
     const title = this.add
-      .text(width / 2, py + 24, "Playtest Tuning", {
-        fontSize: "22px",
+      .text(width / 2, py + 16, "Playtest Tuning", {
+        fontSize: "20px",
         color: "#ffdd44",
         fontStyle: "bold",
       })
       .setOrigin(0.5);
     this.menuContainer.add(title);
 
-    const fieldLabel = this.add
-      .text(px + 24, py + 60, "Match Length", {
-        fontSize: "16px",
-        color: "#ffffff",
-      });
-    this.menuContainer.add(fieldLabel);
+    const inputW = 260;
+    const labelX = px + 14;
+    const inputX = px + panelW - 14 - inputW;
 
-    const unitHint = this.add
-      .text(px + panelW - 24, py + 60, "(ms, s, m)", {
-        fontSize: "14px",
-        color: "#888899",
-      })
-      .setOrigin(1, 0);
-    this.menuContainer.add(unitHint);
+    for (let i = 0; i < FIELDS.length; i++) {
+      const field = FIELDS[i]!;
+      const rowY = py + 36 + i * (rowH + rowGap);
 
-    const fieldBg = this.add.graphics();
-    fieldBg.fillStyle(0x222244, 1);
-    fieldBg.fillRoundedRect(px + 24, py + 84, panelW - 48, 34, 4);
-    fieldBg.lineStyle(1, 0x4488ff, 0.6);
-    fieldBg.strokeRoundedRect(px + 24, py + 84, panelW - 48, 34, 4);
-    this.menuContainer.add(fieldBg);
+      const label = this.add
+        .text(labelX, rowY, field.label, {
+          fontSize: "12px",
+          color: "#ccccdd",
+        });
+      this.menuContainer.add(label);
 
-    const restartLabel = this.add
-      .text(px + panelW - 24, py + 122, "* Restart required", {
-        fontSize: "12px",
-        color: "#ff8844",
-      })
-      .setOrigin(1, 0);
-    this.menuContainer.add(restartLabel);
+      const unitHint = this.add
+        .text(inputX + inputW, rowY + 14, field.unitHint, {
+          fontSize: "10px",
+          color: "#888899",
+        });
+      this.menuContainer.add(unitHint);
 
-    this.menuErrorText = this.add
-      .text(px + 24, py + 142, "", {
-        fontSize: "13px",
-        color: "#ff4444",
-      });
-    this.menuContainer.add(this.menuErrorText);
+      const fieldBg = this.add.graphics();
+      const borderColor = i === this.menuState.activeFieldIndex ? 0x88bbff : 0x4488ff;
+      fieldBg.fillStyle(0x222244, 1);
+      fieldBg.fillRoundedRect(inputX, rowY - 1, inputW, 22, 3);
+      fieldBg.lineStyle(1, borderColor, i === this.menuState.activeFieldIndex ? 0.9 : 0.5);
+      fieldBg.strokeRoundedRect(inputX, rowY - 1, inputW, 22, 3);
+      this.menuContainer.add(fieldBg);
+      this.menuFieldBgs[i] = fieldBg;
 
-    const fieldValueBg = this.add.graphics();
-    this.menuContainer.add(fieldValueBg);
+      const fieldText = this.add
+        .text(inputX + 4, rowY + 1, "", {
+          fontSize: "13px",
+          color: "#ffffff",
+        });
+      this.menuContainer.add(fieldText);
+      this.menuFieldTexts[i] = fieldText;
 
-    this.menuFieldText = this.add
-      .text(px + 32, py + 93, "", {
-        fontSize: "17px",
-        color: "#ffffff",
-      });
-    this.menuContainer.add(this.menuFieldText);
+      const errorText = this.add
+        .text(inputX, rowY + 22, "", {
+          fontSize: "10px",
+          color: "#ff4444",
+        });
+      this.menuContainer.add(errorText);
+      this.menuErrorTexts[i] = errorText;
+
+      const restartReq = this.add
+        .text(px + panelW - 14, rowY, "*", {
+          fontSize: "12px",
+          color: "#ff8844",
+        })
+        .setOrigin(1, 0);
+      this.menuContainer.add(restartReq);
+    }
 
     const btnStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-      fontSize: "15px",
+      fontSize: "14px",
       color: "#ffffff",
       backgroundColor: "#334488",
-      padding: { x: 10, y: 6 },
+      padding: { x: 8, y: 5 },
     };
-    const btnY = py + panelH - 72;
-    const btnGap = 8;
+    const btnY = py + panelH - 50;
+    const btnGap = 6;
 
     const applyBtn = this.add
-      .text(px + 24, btnY, "Apply", btnStyle)
+      .text(px + 14, btnY, "Apply", btnStyle)
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", () => this.onApply());
     this.menuContainer.add(applyBtn);
@@ -837,20 +882,20 @@ export class MatchScene extends Phaser.Scene {
     this.menuContainer.add(restartBtn);
 
     const resetBtn = this.add
-      .text(px + 24, btnY + 36, "Reset Draft", btnStyle)
+      .text(px + 14, btnY + 28, "Reset Draft", btnStyle)
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", () => this.onResetDraft());
     this.menuContainer.add(resetBtn);
 
     const defaultsBtn = this.add
-      .text(resetBtn.x + resetBtn.width + btnGap, btnY + 36, "Defaults / Clear Saved", btnStyle)
+      .text(resetBtn.x + resetBtn.width + btnGap, btnY + 28, "Defaults / Clear Saved", btnStyle)
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", () => this.onStageDefaults());
     this.menuContainer.add(defaultsBtn);
 
     const closeBtn = this.add
-      .text(px + panelW - 24, py + 12, "✕", {
-        fontSize: "18px",
+      .text(px + panelW - 14, py + 10, "✕", {
+        fontSize: "16px",
         color: "#888899",
       })
       .setOrigin(1, 0)
@@ -860,13 +905,41 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private renderPlaytestMenu(): void {
-    this.menuFieldText.setText(this.menuState.fieldValue + "█");
+    const activeIndex = this.menuState.activeFieldIndex;
+    for (let i = 0; i < FIELDS.length; i++) {
+      const raw = this.menuState.fieldValues[i] ?? "";
+      const displayText = i === activeIndex ? raw + "█" : raw;
+      this.menuFieldTexts[i]?.setText(displayText);
 
-    const errMsg =
-      this.menuState.errors.length > 0
-        ? this.menuState.errors.map((e) => e.message).join("; ")
-        : "";
-    this.menuErrorText.setText(errMsg);
+      const fieldErrors = this.menuState.errors.filter((e) => e.field === FIELDS[i]!.key);
+      const errMsg = fieldErrors.length > 0 ? fieldErrors.map((e) => e.message).join("; ") : "";
+      this.menuErrorTexts[i]?.setText(errMsg);
+
+      const bg = this.menuFieldBgs[i];
+      if (bg) {
+        bg.clear();
+        const { width } = this.scale;
+        const panelW = 520;
+        const px = (width - panelW) / 2;
+        const rowH = 30;
+        const rowGap = 2;
+        const inputW = 260;
+        const inputX = px + panelW - 14 - inputW;
+        const rowY = (height: number) => {
+          const fieldRows = FIELDS.length;
+          const fieldsH = fieldRows * (rowH + rowGap);
+          const panelH = 36 + fieldsH + 60;
+          const py = (height - panelH) / 2;
+          return py + 36 + i * (rowH + rowGap);
+        };
+        const ry = rowY(this.scale.height);
+        const borderColor = i === activeIndex ? 0x88bbff : 0x4488ff;
+        bg.fillStyle(0x222244, 1);
+        bg.fillRoundedRect(inputX, ry - 1, inputW, 22, 3);
+        bg.lineStyle(1, borderColor, i === activeIndex ? 0.9 : 0.5);
+        bg.strokeRoundedRect(inputX, ry - 1, inputW, 22, 3);
+      }
+    }
   }
 
   private onApply(): void {
@@ -1030,7 +1103,7 @@ export class MatchScene extends Phaser.Scene {
 
   private renderChicks(): void {
     const view = this.match.view();
-    for (let slotIndex = 0; slotIndex < NORMAL_PEEK_COUNT; slotIndex++) {
+    for (let slotIndex = 0; slotIndex < this.normalPeekCount; slotIndex++) {
       const body = this.chickBodies[slotIndex]!;
       const visibleChick = view.normalChicks.find(
         (chick) => chick.slotIndex === slotIndex,

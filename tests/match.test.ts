@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { Match } from "../src/match/match";
 import { FARMYARD_LAYOUT } from "../src/match/layout";
 import {
-  NORMAL_PEEK_COUNT,
   NORMAL_REFILL_MIN_MS,
   PEEK_ANTICIPATION_DURATION_MS,
 } from "../src/match/rules";
@@ -97,7 +96,7 @@ describe("Match", () => {
     match.advance(0);
 
     const normalChicks = match.view().normalChicks;
-    expect(normalChicks).toHaveLength(NORMAL_PEEK_COUNT);
+    expect(normalChicks).toHaveLength(3);
     expect(normalChicks.some((chick) => chick.spotIndex >= 6)).toBe(true);
   });
 
@@ -273,5 +272,158 @@ describe("Match", () => {
       { type: "greenChickMissed", spotIndex: greenSpot },
     ]);
     expect(match.view().greenChick).toBeNull();
+  });
+
+  describe("with tuned Peek Pressure", () => {
+    it("uses tuned normalPeekCount to control the number of simultaneous normal chicks", () => {
+      const match = new Match({
+        durationMs: 10_000,
+        spotCount: 10,
+        random: constantRandom(0),
+        peekPressureConfig: { normalPeekCount: 1 },
+      });
+      match.advance(0);
+      expect(match.view().normalChicks).toHaveLength(1);
+    });
+
+    it("uses tuned normalPeekDurationMs to control how long chicks stay visible", () => {
+      const match = new Match({
+        durationMs: 10_000,
+        spotCount: 10,
+        random: constantRandom(0),
+        peekPressureConfig: {
+          normalPeekDurationMs: 100,
+          normalRefillMinMs: 10_000,
+          normalRefillMaxMs: 10_000,
+        },
+      });
+      match.advance(0);
+      expect(match.view().normalChicks).toHaveLength(3);
+      match.advance(200);
+      expect(match.view().normalChicks).toHaveLength(0);
+    });
+
+    it("uses tuned normalRefillMinMs and normalRefillMaxMs for refill timing", () => {
+      const match = new Match({
+        durationMs: 50_000,
+        spotCount: 10,
+        random: constantRandom(0),
+        peekPressureConfig: {
+          normalPeekDurationMs: 100,
+          normalRefillMinMs: 5_000,
+          normalRefillMaxMs: 5_000,
+        },
+      });
+      // Initial peeks activate from nextRefillAtMs=0
+      match.advance(50);
+      expect(match.view().normalChicks).toHaveLength(3);
+      // Advance past peek duration: peeks expire, refill set to elapsed + 5000
+      match.advance(100);
+      expect(match.view().normalChicks).toHaveLength(0);
+      // Advance only a bit — refill not yet due
+      match.advance(1_000);
+      expect(match.view().normalChicks).toHaveLength(0);
+      // Advance to just before refill should still be no chicks
+      match.advance(3_000);
+      expect(match.view().normalChicks).toHaveLength(0);
+    });
+
+    it("uses tuned peekAnticipationDurationMs for anticipation timing", () => {
+      const match = new Match({
+        durationMs: 50_000,
+        spotCount: 10,
+        random: constantRandom(0),
+        peekPressureConfig: {
+          normalPeekDurationMs: 100,
+          normalRefillMinMs: 5_000,
+          normalRefillMaxMs: 5_000,
+          peekAnticipationDurationMs: 2_000,
+        },
+      });
+      // Activate initial peeks
+      match.advance(50);
+      expect(match.view().normalChicks).toHaveLength(3);
+      // Expire them
+      match.advance(100);
+      expect(match.view().normalChicks).toHaveLength(0);
+      // Just before anticipation would start (refill time - anticipation duration)
+      match.advance(2_700);
+      // elapsed = 50+100+2700 = 2850, refill scheduled at 2850+0+5000=7850? no...
+      // Actually let me rethink. At expire time elapsed=150, nextRefillAtMs=150+5000=5150
+      // Anticipation starts at 5150-2000=3150. After 2700ms from expire, elapsed=150+2700=2850, still before 3150
+      expect(match.view().peekAnticipations).toHaveLength(0);
+      // Now advance into anticipation window
+      match.advance(500);
+      expect(match.view().peekAnticipations.length).toBeGreaterThan(0);
+      expect(match.view().normalChicks).toHaveLength(0);
+    });
+
+    it("uses tuned normalChickPoints for claim scoring", () => {
+      const match = new Match({
+        durationMs: 9_000,
+        spotCount: 6,
+        random: constantRandom(0),
+        peekPressureConfig: { normalChickPoints: 3 },
+      });
+      match.advance(0);
+      const spot = match.view().normalChicks[0]?.spotIndex ?? 0;
+      match.claim(spot, 1);
+      expect(match.view().scores).toEqual([0, 3]);
+    });
+  });
+
+  describe("with tuned Green Chick", () => {
+    it("does not spawn a green chick when greenChickEnabled is false", () => {
+      const match = new Match({
+        durationMs: 10_000,
+        spotCount: 6,
+        random: constantRandom(0),
+        greenChickConfig: { enabled: false },
+      });
+      match.advance(10_000);
+      expect(match.view().greenChick).toBeNull();
+    });
+
+    it("uses tuned greenChickPoints for scoring", () => {
+      const match = new Match({
+        durationMs: 9_000,
+        spotCount: 6,
+        random: constantRandom(0),
+        greenChickConfig: { points: 10 },
+      });
+      match.advance(0);
+      match.advance(2_000);
+      const greenSpot = match.view().greenChick?.spotIndex ?? 0;
+      match.claim(greenSpot, 0);
+      expect(match.view().scores).toEqual([10, 0]);
+    });
+
+    it("uses tuned schedule to control green chick appearance timing", () => {
+      const match = new Match({
+        durationMs: 100_000,
+        spotCount: 6,
+        random: constantRandom(0),
+        greenChickConfig: { scheduleMinMs: 1_000, scheduleMaxMs: 1_000 },
+      });
+      match.advance(0);
+      expect(match.view().greenChick).toBeNull();
+      // schedule is scaled: 1000 * 100000 / 90000 ≈ 1111ms
+      match.advance(1_200);
+      expect(match.view().greenChick).not.toBeNull();
+    });
+
+    it("scales schedule proportionally with match duration", () => {
+      const match = new Match({
+        durationMs: 180_000,
+        spotCount: 6,
+        random: constantRandom(0),
+        greenChickConfig: { scheduleMinMs: 20_000, scheduleMaxMs: 70_000 },
+      });
+      match.advance(0);
+      expect(match.view().greenChick).toBeNull();
+      // scheduleMin scaled: 20000 * 180000 / 90000 = 40000
+      match.advance(40_100);
+      expect(match.view().greenChick).not.toBeNull();
+    });
   });
 });

@@ -1,4 +1,5 @@
 import {
+  type PlaytestTuning,
   type TuningDraft,
   type ValidationError,
   createTuningDraft,
@@ -6,13 +7,101 @@ import {
   stageDefaults,
   validateTuning,
   parseDurationMs,
+  parseCount,
+  parseBoolean,
   formatDurationMs,
+  cloneTuning,
 } from "./playtestTuning";
+
+export type FieldParser = (raw: string) => { parsed: unknown; error: string | null };
+
+export interface FieldDef {
+  key: string;
+  label: string;
+  unitHint: string;
+  restartRequired: boolean;
+  parser: FieldParser;
+}
+
+export function parseDurationField(raw: string): { parsed: unknown; error: string | null } {
+  const val = parseDurationMs(raw);
+  if (val === null) return { parsed: null, error: "Invalid duration" };
+  return { parsed: val, error: null };
+}
+
+export function parseCountField(raw: string): { parsed: unknown; error: string | null } {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return { parsed: null, error: null };
+  const val = parseCount(raw);
+  if (val === null) return { parsed: null, error: "Invalid whole number" };
+  return { parsed: val, error: null };
+}
+
+export function parseBooleanField(raw: string): { parsed: unknown; error: string | null } {
+  const val = parseBoolean(raw);
+  if (val === null) return { parsed: null, error: 'Must be true/false, 1/0, or yes/no' };
+  return { parsed: val, error: null };
+}
+
+export function formatFieldValue(key: string, tuning: PlaytestTuning): string {
+  const tuningRecord = tuning as unknown as Record<string, unknown>;
+  const val = tuningRecord[key];
+  if (key === "matchDurationMs" && typeof val === "number") return formatDurationMs(val);
+  if (typeof val === "boolean") return val ? "true" : "false";
+  if (typeof val === "number" || typeof val === "string") return String(val);
+  return "";
+}
+
+export const FIELDS: FieldDef[] = [
+  { key: "matchDurationMs", label: "Match Length", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+  { key: "normalPeekCount", label: "Normal Peek count", unitHint: "(whole number)", restartRequired: true, parser: parseCountField },
+  { key: "normalPeekDurationMs", label: "Peek duration", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+  { key: "normalRefillMinMs", label: "Refill min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+  { key: "normalRefillMaxMs", label: "Refill max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+  { key: "peekAnticipationDurationMs", label: "Peek Anticipation", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+  { key: "normalChickPoints", label: "Normal chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField },
+  { key: "greenChickEnabled", label: "Green Chick enabled", unitHint: "(true/false)", restartRequired: true, parser: parseBooleanField },
+  { key: "greenChickPoints", label: "Green Chick points", unitHint: "(whole number)", restartRequired: true, parser: parseCountField },
+  { key: "greenChickScheduleMinMs", label: "Green Chick schedule min", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+  { key: "greenChickScheduleMaxMs", label: "Green Chick schedule max", unitHint: "(ms, s, m)", restartRequired: true, parser: parseDurationField },
+];
+
+function buildFieldValues(tuning: PlaytestTuning): string[] {
+  return FIELDS.map((f) => formatFieldValue(f.key, tuning));
+}
+
+function applyFieldValues(
+  draft: TuningDraft,
+  fieldValues: string[],
+): { draft: TuningDraft; errors: ValidationError[] } {
+  const newDraft = cloneTuning(draft.draft);
+  const fieldErrors: ValidationError[] = [];
+
+  for (let i = 0; i < FIELDS.length; i++) {
+    const field = FIELDS[i]!;
+    const raw = fieldValues[i] ?? "";
+    const { parsed, error } = field.parser(raw);
+    if (error !== null) {
+      fieldErrors.push({ field: field.key, message: error });
+    } else if (parsed !== null) {
+      (newDraft as unknown as Record<string, unknown>)[field.key] = parsed;
+    }
+  }
+
+  const tuningErrors = validateTuning(newDraft);
+  const allErrors = [...fieldErrors, ...tuningErrors];
+
+  return {
+    draft: { draft: newDraft, applied: draft.applied },
+    errors: allErrors,
+  };
+}
 
 export interface PlaytestMenuState {
   visible: boolean;
   draft: TuningDraft;
-  fieldValue: string;
+  fieldValues: string[];
+  activeFieldIndex: number;
   errors: ValidationError[];
 }
 
@@ -21,7 +110,8 @@ export function createPlaytestMenuState(): PlaytestMenuState {
   return {
     visible: false,
     draft,
-    fieldValue: formatDurationMs(draft.draft.matchDurationMs),
+    fieldValues: buildFieldValues(draft.draft),
+    activeFieldIndex: 0,
     errors: [],
   };
 }
@@ -35,28 +125,39 @@ export function closeMenu(_state: PlaytestMenuState): PlaytestMenuState {
   return {
     visible: false,
     draft,
-    fieldValue: formatDurationMs(draft.draft.matchDurationMs),
+    fieldValues: buildFieldValues(draft.draft),
+    activeFieldIndex: 0,
     errors: [],
   };
+}
+
+export function activateField(
+  state: PlaytestMenuState,
+  index: number,
+): PlaytestMenuState {
+  const clamped = Math.max(0, Math.min(FIELDS.length - 1, index));
+  return { ...state, activeFieldIndex: clamped };
 }
 
 export function updateFieldValue(
   state: PlaytestMenuState,
   raw: string,
 ): PlaytestMenuState {
-  const parsed = parseDurationMs(raw);
-  if (parsed === null) {
-    const errors: ValidationError[] = [
-      { field: "matchDurationMs", message: "Invalid duration" },
-    ];
-    return { ...state, fieldValue: raw, errors };
-  }
-  const newDraft: TuningDraft = {
-    draft: { matchDurationMs: parsed },
-    applied: state.draft.applied,
-  };
-  const errors = validateTuning(newDraft.draft);
-  return { ...state, draft: newDraft, fieldValue: raw, errors };
+  const newFieldValues = [...state.fieldValues];
+  newFieldValues[state.activeFieldIndex] = raw;
+  const { draft, errors } = applyFieldValues(state.draft, newFieldValues);
+  return { ...state, draft, fieldValues: newFieldValues, errors };
+}
+
+export function updateFieldValueAt(
+  state: PlaytestMenuState,
+  index: number,
+  raw: string,
+): PlaytestMenuState {
+  const newFieldValues = [...state.fieldValues];
+  newFieldValues[index] = raw;
+  const { draft, errors } = applyFieldValues(state.draft, newFieldValues);
+  return { ...state, draft, fieldValues: newFieldValues, errors };
 }
 
 export function applyTuning(state: PlaytestMenuState): PlaytestMenuState {
@@ -65,7 +166,7 @@ export function applyTuning(state: PlaytestMenuState): PlaytestMenuState {
   return {
     ...state,
     draft: newDraft,
-    fieldValue: formatDurationMs(newDraft.draft.matchDurationMs),
+    fieldValues: buildFieldValues(newDraft.draft),
     errors: [],
   };
 }
@@ -74,10 +175,10 @@ export function resetDraftAction(state: PlaytestMenuState): PlaytestMenuState {
   return {
     ...state,
     draft: {
-      draft: { ...state.draft.applied },
+      draft: cloneTuning(state.draft.applied),
       applied: state.draft.applied,
     },
-    fieldValue: formatDurationMs(state.draft.applied.matchDurationMs),
+    fieldValues: buildFieldValues(state.draft.applied),
     errors: [],
   };
 }
@@ -89,7 +190,7 @@ export function stageDefaultsAction(
   return {
     ...state,
     draft: staged,
-    fieldValue: formatDurationMs(staged.draft.matchDurationMs),
+    fieldValues: buildFieldValues(staged.draft),
     errors: [],
   };
 }

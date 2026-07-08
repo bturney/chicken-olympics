@@ -14,6 +14,10 @@ import {
   tickGreenChickState,
   tick,
   tickPeekState,
+  DEFAULT_PEEK_PRESSURE_CONFIG,
+  DEFAULT_GREEN_CHICK_CONFIG,
+  type PeekPressureConfig,
+  type GreenChickConfig,
   type GreenChickState,
   type MatchState,
   type PlayerIndex,
@@ -28,6 +32,8 @@ export interface MatchOptions {
   spotCount: number;
   spotPositions?: readonly SpotPosition[];
   random?: () => number;
+  peekPressureConfig?: Partial<PeekPressureConfig>;
+  greenChickConfig?: Partial<GreenChickConfig>;
 }
 
 export interface VisibleNormalChick {
@@ -74,19 +80,30 @@ export class Match {
   private readonly random: () => number;
   private readonly spotCount: number;
   private readonly spotPositions: readonly SpotPosition[] | undefined;
+  private readonly peekPressureConfig: PeekPressureConfig;
+  private readonly greenChickConfig: GreenChickConfig;
 
   constructor(options: MatchOptions) {
+    this.peekPressureConfig = {
+      ...DEFAULT_PEEK_PRESSURE_CONFIG,
+      ...options.peekPressureConfig,
+    };
+    this.greenChickConfig = {
+      ...DEFAULT_GREEN_CHICK_CONFIG,
+      ...options.greenChickConfig,
+    };
     this.matchState = createMatchState({
       durationMs: options.durationMs,
       playerSlotCount: options.playerSlotCount,
     });
-    this.peekState = createPeekState(0);
+    this.peekState = createPeekState(0, this.peekPressureConfig);
     this.random = options.random ?? Math.random;
     this.spotCount = options.spotCount;
     this.spotPositions = options.spotPositions;
     this.greenChickState = createGreenChickState(
       this.matchState.durationMs,
       this.random,
+      this.greenChickConfig,
     );
   }
 
@@ -98,12 +115,14 @@ export class Match {
       this.spotCount,
       this.random,
       this.spotPositions,
+      this.peekPressureConfig,
     );
     const previousGreenStatus = this.greenChickState.status;
     const previousGreenSpot = this.greenChickState.activeSpotIndex;
     const previousGreenActiveSpot = getActiveGreenChickSpotIndex(
       this.greenChickState,
       this.matchState.elapsedMs,
+      this.peekPressureConfig,
     );
     this.greenChickState = tickGreenChickState(
       this.greenChickState,
@@ -112,10 +131,12 @@ export class Match {
       this.spotCount,
       this.random,
       this.spotPositions,
+      this.peekPressureConfig,
     );
     const greenActiveSpot = getActiveGreenChickSpotIndex(
       this.greenChickState,
       this.matchState.elapsedMs,
+      this.peekPressureConfig,
     );
     if (previousGreenActiveSpot === null && greenActiveSpot !== null) {
       return [{ type: "greenChickAppeared", spotIndex: greenActiveSpot }];
@@ -132,7 +153,11 @@ export class Match {
 
   claim(spotIndex: number, playerIndex: PlayerIndex): MatchEvent[] {
     const now = this.matchState.elapsedMs;
-    const greenSpot = getActiveGreenChickSpotIndex(this.greenChickState, now);
+    const greenSpot = getActiveGreenChickSpotIndex(
+      this.greenChickState,
+      now,
+      this.peekPressureConfig,
+    );
     if (greenSpot === spotIndex) {
       const result = attemptGreenChickClaim(
         this.matchState,
@@ -140,6 +165,8 @@ export class Match {
         spotIndex,
         playerIndex,
         now,
+        this.peekPressureConfig,
+        this.greenChickConfig,
       );
       this.matchState = result.matchState;
       this.greenChickState = result.greenChickState;
@@ -148,7 +175,7 @@ export class Match {
     }
 
     const slotIndex = this.peekState.peeks.findIndex(
-      (peek) => peek.activeSpotIndex === spotIndex && isPeekActive(peek, now),
+      (peek) => peek.activeSpotIndex === spotIndex && isPeekActive(peek, now, this.peekPressureConfig),
     );
     const result = attemptClaim(
       this.matchState,
@@ -157,6 +184,7 @@ export class Match {
       playerIndex,
       now,
       this.random,
+      this.peekPressureConfig,
     );
     this.matchState = result.matchState;
     this.peekState = result.peekState;
@@ -168,7 +196,7 @@ export class Match {
   view(): MatchView {
     const now = this.matchState.elapsedMs;
     const activeSpots = new Set(
-      getActiveNormalSpotIndices(this.peekState, now),
+      getActiveNormalSpotIndices(this.peekState, now, this.peekPressureConfig),
     );
     return {
       scores: this.matchState.scores,
@@ -179,7 +207,7 @@ export class Match {
       normalChicks: this.peekState.peeks.flatMap((peek, slotIndex) => {
         if (
           peek.activeSpotIndex === null ||
-          !isPeekActive(peek, now) ||
+          !isPeekActive(peek, now, this.peekPressureConfig) ||
           !activeSpots.has(peek.activeSpotIndex)
         ) {
           return [];
@@ -187,12 +215,17 @@ export class Match {
         return [{ slotIndex, spotIndex: peek.activeSpotIndex }];
       }),
       greenChick:
-        getActiveGreenChickSpotIndex(this.greenChickState, now) === null
+        getActiveGreenChickSpotIndex(
+          this.greenChickState,
+          now,
+          this.peekPressureConfig,
+        ) === null
           ? null
           : {
               spotIndex: getActiveGreenChickSpotIndex(
                 this.greenChickState,
                 now,
+                this.peekPressureConfig,
               )!,
             },
       peekAnticipations: getActivePeekAnticipations(this.peekState, now),

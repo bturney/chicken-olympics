@@ -15,5 +15,5 @@
     "allowImportingTsExtensions": true,
     "jsx": "preserve"
   },
-  "include": ["src", "tests", "*.config.ts"]
+  "include": ["src", "tests", "e2e", "*.config.ts"]
 }

@@ -21,6 +21,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/", ".opencode/"],
+    ignores: ["dist/", ".opencode/", "playwright-report/", "test-results/"],
   },
 );

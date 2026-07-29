@@ -36,6 +36,10 @@ _Avoid_: Constant crowd noise, background spam
 The end-of-match screen that shows the final scores and celebrates the winner on an Olympic-style podium.
 _Avoid_: Results screen, game over screen
 
+**Chicken-Visible Screen**:
+A scene that renders one or more chickens. A full visual treatment includes every visual asset on a chicken-visible screen; scenes without chickens remain out of scope unless shared styling reaches them naturally.
+_Avoid_: Whole-game art pass, normal-claim-only art slice
+
 **Player Chicken**:
 The non-green, non-yellow colored chicken chosen by a player for a match.
 _Avoid_: Avatar, character, chicken color

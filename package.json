@@ -13,7 +13,10 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
+    "agent:bootstrap": "./scripts/agent-bootstrap.sh",
+    "agent:verify": "./scripts/agent-verify.sh",
+    "agent:teardown": "./scripts/agent-teardown.sh"
   },
   "dependencies": {
     "phaser": "^4.2.0"

@@ -52,16 +52,16 @@ Neither a REST API nor an editor's scripting/CLI documentation is MCP evidence. 
 
 ## Comparison at the Prototype Gate
 
-| Criterion | Recraft-assisted + human animation | Krita + packer | Aseprite handoff |
-| --- | --- | --- | --- |
-| Generate initial non-pixel concepts | Yes, raster/vector API | No, hand-authored | No |
-| Correct/cleanup | API editing plus human work | Direct human work | Limited frame/sheet preparation |
-| Transparent output | Documented background removal; inspect alpha | Frame sequence can retain transparent layers; inspect export | PNG export is documented by Phaser's Aseprite instructions |
-| Animation/sheet support | No documented animation/sheet endpoint | Frames, but no documented sheet packing in consulted guide | Documented sheet import/export; Phaser PNG+JSON handoff |
-| Consistency mechanism | Reusable reference-based style, then human approval | Art direction and source files | Preserves supplied frames only |
-| Commercial/provenance position | Paid/API terms grant ownership, but human clearance and records still needed | Artist owns work; track all external inputs | Editor permits commercial assets; track imported inputs |
-| Published cost evidence | Variable API-unit consumption; unit is $0.001 | Free software | $19.99 minimum per developer |
-| Official agent/MCP evidence | REST API only; no MCP found | No MCP found | No MCP found |
+| Criterion                           | Recraft-assisted + human animation                                           | Krita + packer                                               | Aseprite handoff                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| Generate initial non-pixel concepts | Yes, raster/vector API                                                       | No, hand-authored                                            | No                                                         |
+| Correct/cleanup                     | API editing plus human work                                                  | Direct human work                                            | Limited frame/sheet preparation                            |
+| Transparent output                  | Documented background removal; inspect alpha                                 | Frame sequence can retain transparent layers; inspect export | PNG export is documented by Phaser's Aseprite instructions |
+| Animation/sheet support             | No documented animation/sheet endpoint                                       | Frames, but no documented sheet packing in consulted guide   | Documented sheet import/export; Phaser PNG+JSON handoff    |
+| Consistency mechanism               | Reusable reference-based style, then human approval                          | Art direction and source files                               | Preserves supplied frames only                             |
+| Commercial/provenance position      | Paid/API terms grant ownership, but human clearance and records still needed | Artist owns work; track all external inputs                  | Editor permits commercial assets; track imported inputs    |
+| Published cost evidence             | Variable API-unit consumption; unit is $0.001                                | Free software                                                | $19.99 minimum per developer                               |
+| Official agent/MCP evidence         | REST API only; no MCP found                                                  | No MCP found                                                 | No MCP found                                               |
 
 ## Decision Criteria for a Human-Reviewed Prototype
 

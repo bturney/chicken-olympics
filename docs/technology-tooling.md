@@ -24,7 +24,10 @@ Chicken Olympics will start as a static browser game optimized for a two-player 
 - Unit tests: Vitest for the pure match engine, including timing, active peeks, green chick scheduling, scoring, and winner calculation.
 - Linting: ESLint.
 - Formatting: Prettier.
-- CI: GitHub Actions runs install, typecheck, lint, Vitest, and Vite build.
+- Browser tests: Playwright exercises native playtest-menu interactions against
+  a real Vite process.
+- CI: GitHub Actions runs the agent verification gate: install, typecheck,
+  lint, formatting, Vitest, build, Chromium provisioning, and Playwright.
 
 ## Assets and Layout
 

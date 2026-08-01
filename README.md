@@ -13,6 +13,24 @@ Chicken Olympics is a local two-player browser game built with Phaser 4, TypeScr
 npm install
 ```
 
+## Agent Lifecycle
+
+An unattended implementation or QA attempt uses this bounded lifecycle:
+
+```bash
+set -euo pipefail
+trap 'npm run agent:teardown' EXIT
+npm run agent:bootstrap
+npm run agent:verify
+```
+
+`agent:bootstrap` validates Node 24, runs `npm ci`, and installs the pinned
+Chromium runtime inside the checkout. `agent:verify` runs the canonical quality
+gate plus the browser interaction suite, writing an inspectable manifest and
+logs to `artifacts/<task-id>/<attempt-id>/`. Set `AGENT_TASK_ID` and
+`AGENT_ATTEMPT_ID` to keep concurrent attempts separate; both default to local
+values for developer use. No credentials are required for the game itself.
+
 ## Run Locally
 
 Start the Vite dev server:
